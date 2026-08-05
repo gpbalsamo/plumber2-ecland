@@ -1,0 +1,35 @@
+# NetCDF datasets
+*.nc
+*.nc4
+*.cdf
+
+# ecLand runtime and generated output
+scripts/work/
+work/
+output/
+outputs/
+results/
+logs/
+*.log
+*.out
+*.err
+
+# Scheduler output
+slurm-*.out
+
+# Python
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+
+# Temporary and editor files
+*.tmp
+*.temp
+*~
+.#*
+.DS_Store
+
+# Local environments
+.env
+.venv/
+venv/
