@@ -2,7 +2,7 @@
 scripts/work/
 work/
 output/
-outputs/
+postprocessed/
 results/
 logs/
 *.log
@@ -28,3 +28,4 @@ __pycache__/
 .env
 .venv/
 venv/
+postprocessed/date_validation.csv
