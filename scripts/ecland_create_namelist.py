@@ -147,12 +147,31 @@ if __name__ == "__main__":
       iniSec=int((time_variable - time_variable.replace(hour=0, minute=0, second=0, microsecond=0)).total_seconds())
 
     nstart=0
-    tstep=1800.0
-    forcing_step=(forcingFile.variables['time'][1].data - forcingFile.variables['time'][0].data)
-    #if forcing_type=='insitu':
-    #  forcing_step=(forcingFile.variables['time'][1].data - forcingFile.variables['time'][0].data)*3600.0
+
+    # Derive forcing step in seconds, respecting the time variable's units.
+    # The raw numeric difference between consecutive time values must be
+    # multiplied by the unit factor to obtain seconds.
+    time_units = forcingFile.variables['time'].units.lower().strip()
+    raw_step = float(forcingFile.variables['time'][1].data - forcingFile.variables['time'][0].data)
+    if time_units.startswith('seconds since'):
+        forcing_step = raw_step
+    elif time_units.startswith('minutes since'):
+        forcing_step = raw_step * 60.0
+    elif time_units.startswith('hours since'):
+        forcing_step = raw_step * 3600.0
+    elif time_units.startswith('days since'):
+        forcing_step = raw_step * 86400.0
+    else:
+        # Fallback: assume seconds and warn.
+        import warnings
+        warnings.warn(f"Unrecognised time units '{time_units}'; assuming seconds.")
+        forcing_step = raw_step
+
+    # Model timestep matches the forcing interval exactly.
+    tstep = forcing_step
+
     nforcing=len(forcingFile.variables['time'])
-    nstop=int(nforcing*(forcing_step/tstep)-2)
+    nstop=int(nforcing - 2)
     if 'lat' in forcingFile.dimensions and 'lon' in forcingFile.dimensions:
         nlat=len(forcingFile.dimensions['lat'])
         nlon=len(forcingFile.dimensions['lon'])

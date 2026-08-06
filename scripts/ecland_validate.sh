@@ -18,6 +18,12 @@ SCRIPTS_DIR="$( cd $( dirname "${BASH_SOURCE[0]}" ) && pwd -P )"
 
 # set defaults
 
+SITE=""
+NLOOP=""
+WORK_DIR=""
+OUTPUT_DIR=""
+CONTROL_DIR=""
+
 while getopts ":s:n:w:o:c:" opt; do
   case $opt in
     s) SITE="$OPTARG" ;;
@@ -37,6 +43,15 @@ while getopts ":s:n:w:o:c:" opt; do
 done
 
 vars_to_test="SoilTemp SoilMois AvgSurfT"
+
+# Validate required arguments
+for required in SITE NLOOP WORK_DIR OUTPUT_DIR CONTROL_DIR; do
+  if [[ -z "${!required}" ]]; then
+    echo "ERROR: -${required:0:1} ${required} is required." >&2
+    echo "Usage: $(basename "$0") -s SITE -n NLOOP -w WORK_DIR -o OUTPUT_DIR -c CONTROL_DIR" >&2
+    exit 1
+  fi
+done
 
 # paths
 ctlres=${CONTROL_DIR}/${SITE}

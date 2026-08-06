@@ -124,6 +124,7 @@ Optional paths:
 
 Optional run controls:
   -s SITE                Run only one site; default is all matching sites
+  -S SITE_LIST_FILE      File with one site per line; overrides -s and auto-discovery
   -l NLOOP               Number of loops; default: 1
   -R LRESTART            Use restart files: true or false; default: false
   -n NAMELIST_FILE       ecLand namelist template
@@ -172,6 +173,7 @@ PROJECT_ROOT=$(
 # ---------------------------------------------------------------------------
 
 SITE=""
+SITE_LIST_FILE=""
 NLOOP=1
 LRESTART=false
 ECLAND_MASTER="ecland-master"
@@ -201,7 +203,7 @@ if [[ $# -eq 0 ]]; then
   exit 1
 fi
 
-while getopts ":hg:t:i:o:w:x:s:n:c:l:R:m:" opt; do
+while getopts ":hg:t:i:o:w:x:s:S:n:c:l:R:m:" opt; do
   case "${opt}" in
     g) GROUP="${OPTARG}" ;;
     t) FORCING_TYPE="${OPTARG}" ;;
@@ -210,6 +212,7 @@ while getopts ":hg:t:i:o:w:x:s:n:c:l:R:m:" opt; do
     w) WORK_DIR="${OPTARG}" ;;
     x) ECLAND_MASTER="${OPTARG}" ;;
     s) SITE="${OPTARG}" ;;
+    S) SITE_LIST_FILE="${OPTARG}" ;;
     n) NAMELIST_FILE="${OPTARG}" ;;
     c) NAMELIST_CMF="${OPTARG}" ;;
     l) NLOOP="${OPTARG}" ;;
@@ -285,7 +288,13 @@ fi
 
 declare -a SITES=()
 
-if [[ -n "${SITE}" ]]; then
+if [[ -n "${SITE_LIST_FILE}" ]]; then
+  if [[ ! -f "${SITE_LIST_FILE}" ]]; then
+    echo "ERROR: site list file not found: ${SITE_LIST_FILE}" >&2
+    exit 1
+  fi
+  mapfile -t SITES < <(grep -v '^ *#' "${SITE_LIST_FILE}" | grep -v '^ *$')
+elif [[ -n "${SITE}" ]]; then
   SITES=("${SITE}")
 else
   mapfile -t SITES < <(find_sites "${FORCING_DIR}" "${FORCING_TYPE}")
