@@ -11,6 +11,7 @@ plumber2-ecland/
 ├── forcing/PLUMBER2/       # Meteorological forcing files (NetCDF, tracked via Git LFS)
 ├── namelists/              # ecLand namelist configuration files
 ├── scripts/                # Run, post-processing and validation scripts
+│   └── all_sites_plumber2.txt      # Complete list of 170 PLUMBER2 sites
 │   └── best_sites_to_benchmark.txt  # Curated list of 42 benchmark sites
 ├── output/                 # Model output — excluded from git
 └── postprocessed/          # Post-processed output — excluded from git
