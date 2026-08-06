@@ -14,9 +14,28 @@ plumber2-ecland/
 └── postprocessed/          # Post-processed output — excluded from git
 ```
 
+## Getting started
+
+Clone the repository with Git LFS support so that the NetCDF pointer files are fetched correctly:
+
+```bash
+# Install Git LFS if not already available
+git lfs install
+
+# Clone the repository
+git clone git@github.com:gpbalsamo/plumber2-ecland.git
+cd plumber2-ecland
+```
+
+The `forcing/PLUMBER2/` and `clim/PLUMBER2/` directories contain LFS pointers after cloning. Run the following to download the actual NetCDF files:
+
+```bash
+bash scripts/ecland_retrieve_lfs.sh --all
+```
+
 ## Requirements
 
-- ecLand executable (built separately; see [ECMWF ecLand documentation](https://confluence.ecmwf.int/display/ECLAND))
+- ecLand executable (built separately; see [ECMWF ecLand](https://github.com/ecmwf-ifs/ecland))
 - ECMWF HPC environment with the following modules:
   - `prgenv/intel`, `intel/2021.4`
   - `hpcx-openmpi/2.9`, `netcdf4/4.9.1`
@@ -25,21 +44,23 @@ plumber2-ecland/
 
 ## Usage
 
-### 1. Retrieve forcing data
+### 1. Retrieve forcing and clim data
+
+Copy forcing and clim files from git-lfs to local repo:
 
 ```bash
-scripts/ecland_retrieve.sh <file_path> [target_path]
+scripts/ecland_retrieve_lfs.sh --all
 ```
 
-### 2. Run experiments
+### 2. Run experiment and postprocess output
 
-Edit `scripts/ecland_run.sh` to set paths and options, then:
+Edit `scripts/run_and_proc_plumber2.sh` to set paths and options, then:
 
 ```bash
-bash scripts/ecland_run.sh
+bash scripts/run_and_proc_plumber2.sh
 ```
 
-Or use the lower-level script directly:
+Note this script make use of the lower-level script which can be run directly:
 
 ```bash
 scripts/ecland_run_experiment.sh \
@@ -52,7 +73,7 @@ scripts/ecland_run_experiment.sh \
   -w <work_dir>
 ```
 
-### 3. Post-process output
+The postprocessing of model output is done by `scripts/postproc_plumber2.py`
 
 ```bash
 python3 scripts/postproc_plumber2.py \
@@ -60,7 +81,7 @@ python3 scripts/postproc_plumber2.py \
   --output-dir <postprocessed_dir>
 ```
 
-### 4. Validate results
+### 3. Validate results
 
 ```bash
 scripts/ecland_validate.sh

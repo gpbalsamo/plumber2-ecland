@@ -72,7 +72,7 @@ INPUT_FILES+=(${FORCING_DIR}/met_${FORCING_TYPE}HT_${SITE}.nc)
 INPUT_FILES+=(${INICLM_DIR}/surfinit_${SITE}.nc)
 INPUT_FILES+=(${INICLM_DIR}/surfclim_${SITE}.nc)
 for INPUT_FILE in ${INPUT_FILES[*]}; do
-  trace ${SCRIPTS_DIR}/ecland_retrieve.sh ${INPUT_FILE} ${INPUT_DIR}/$(basename ${INPUT_FILE})
+  trace ${SCRIPTS_DIR}/ecland_retrieve_lfs.sh ${INPUT_FILE} ${INPUT_DIR}/$(basename ${INPUT_FILE})
 done
 
 #****************************** Run the simulations *****************************#
