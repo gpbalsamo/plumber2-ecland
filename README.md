@@ -46,7 +46,7 @@ bash scripts/ecland_retrieve_lfs.sh --all
 
 ### 1. Retrieve forcing and clim data
 
-Copy forcing and clim files from git-lfs to local repo:
+Copy forcing and clim files from git-lfs to your local plumber2-ecland repo:
 
 ```bash
 scripts/ecland_retrieve_lfs.sh --all
@@ -81,11 +81,11 @@ python3 scripts/postproc_plumber2.py \
   --output-dir <postprocessed_dir>
 ```
 
-### 3. Validate results
+### 3. Check results
 
+To check the postprocessed output run:
 ```bash
-scripts/ecland_validate.sh
-python3 scripts/ecland_validate_stats.py
+python3 scripts/check_plumber2_dates.py
 ```
 
 ## Namelist
