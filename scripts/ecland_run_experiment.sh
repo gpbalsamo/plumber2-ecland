@@ -313,7 +313,7 @@ echo "Sites found     : ${#SITES[@]}"
 declare -a job_ids=()
 
 # Maximum number of concurrently queued/running SLURM jobs.
-MAX_CONCURRENT=20
+MAX_CONCURRENT=25
 
 # ---------------------------------------------------------------------------
 # Helper: remove finished jobs from job_ids; return number still active.

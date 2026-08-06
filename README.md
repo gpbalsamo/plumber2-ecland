@@ -63,7 +63,7 @@ Edit `scripts/run_and_proc_plumber2.sh` to set paths and options, then:
 bash scripts/run_and_proc_plumber2.sh
 ```
 
-Note this script make use of the lower-level script which can be run directly:
+Note this script runs in batch a lower-level script (permitting 25 sites simulations in parallel to speed-up), however it can be run also directly:
 
 ```bash
 scripts/ecland_run_experiment.sh \
