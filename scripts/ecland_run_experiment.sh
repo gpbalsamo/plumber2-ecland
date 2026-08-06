@@ -383,20 +383,24 @@ for cs in "${SITES[@]}"; do
   check_restart_files
 
   if [[ "${LBATCH:-false}" == true ]]; then
-    # Submit one SLURM job per site. At most 25 jobs are submitted before
+    # Submit one SLURM job per site. At most 20 jobs are submitted before
     # waiting for the current group to complete.
     job_output=$(
       sbatch \
         --export="LAUNCH=mpirun -np 1,MEM_PER_CPU=${MEM_PER_CPU:-},cs=${cs},ECLAND_MASTER=${ECLAND_MASTER},WORK_DIR=${WORK_DIR},OUTPUT_DIR=${OUTPUT_DIR},FORCING_DIR=${FORCING_DIR},INICLM_DIR=${INICLM_DIR},FORCING_TYPE=${FORCING_TYPE},NLOOP=${NLOOP},NAMELIST=${NAMELIST},SCRIPTS_DIR=${SCRIPTS_DIR},LRESTART=${LRESTART},PATH=${ecland_ROOT:-../ecland_eclairs-build}/bin:${PATH}" \
         "${SCRIPTS_DIR}/run_sbatch.sh"
-    )
+    ) || { echo "ERROR: sbatch failed for site ${cs}" >&2; continue; }
 
     job_id=$(awk '{print $4}' <<<"${job_output}")
+    if [[ -z "${job_id}" ]]; then
+      echo "ERROR: could not extract job ID for site ${cs} (sbatch output: ${job_output})" >&2
+      continue
+    fi
     job_ids+=("${job_id}")
     echo "Submitted SLURM job ${job_id} for ${cs}"
 
-    if [[ ${#job_ids[@]} -eq 25 ]]; then
-      echo "Waiting for the current group of 25 jobs..."
+    if [[ ${#job_ids[@]} -eq 20 ]]; then
+      echo "Waiting for the current group of 20 jobs..."
 
       for job_id in "${job_ids[@]}"; do
         while true; do
