@@ -354,7 +354,7 @@ wait_for_slot() {
 
 site_num=0
 for cs in "${SITES[@]}"; do
-  (( site_num++ )) || true
+  site_num=$(( site_num + 1 ))
   echo
   echo "=================================================================="
   echo "Preparing site: ${cs} (${site_num}/${#SITES[@]})"
