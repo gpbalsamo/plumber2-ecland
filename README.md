@@ -10,6 +10,7 @@ plumber2-ecland/
 ├── forcing/PLUMBER2/       # Meteorological forcing files (NetCDF, tracked via Git LFS)
 ├── namelists/              # ecLand namelist configuration files
 ├── scripts/                # Run, post-processing and validation scripts
+│   └── best_sites_to_benchmark.txt  # Curated list of 42 benchmark sites
 ├── output/                 # Model output — excluded from git
 └── postprocessed/          # Post-processed output — excluded from git
 ```
@@ -85,6 +86,27 @@ python3 scripts/postproc_plumber2.py \
 
 To check the postprocessed output run:
 ```bash
+python3 scripts/check_plumber2_dates.py
+```
+
+## Benchmarking
+
+A curated list of 42 recommended benchmark sites (selected by Gab Abramowitz) is provided in `scripts/best_sites_to_benchmark.txt`. These sites offer good spatial and biome diversity and are suitable for model evaluation.
+
+To run ecLand only over the benchmark sites:
+
+```bash
+scripts/ecland_run_experiment.sh \
+  -g PLUMBER2 \
+  -t insitu \
+  -S scripts/best_sites_to_benchmark.txt \
+  -x <path_to_ecland_executable>
+```
+
+To post-process and validate only the benchmark sites:
+
+```bash
+python3 scripts/postproc_plumber2.py --site $(paste -sd' ' scripts/best_sites_to_benchmark.txt | sed 's/ / --site /g')
 python3 scripts/check_plumber2_dates.py
 ```
 
