@@ -312,14 +312,52 @@ echo "Sites found     : ${#SITES[@]}"
 # Keep submitted SLURM job IDs so the script can wait for completion.
 declare -a job_ids=()
 
+# Maximum number of concurrently queued/running SLURM jobs.
+MAX_CONCURRENT=20
+
+# ---------------------------------------------------------------------------
+# Helper: remove finished jobs from job_ids; return number still active.
+# ---------------------------------------------------------------------------
+poll_jobs() {
+  local active=()
+  local jid status
+  for jid in "${job_ids[@]}"; do
+    status=$(
+      scontrol show job "${jid}" 2>/dev/null |
+        awk -F'JobState=' 'NF > 1 {print $2}' | awk '{print $1}'
+    )
+    if [[ "${status}" == "PENDING"    ||
+          "${status}" == "RUNNING"    ||
+          "${status}" == "CONFIGURING" ||
+          "${status}" == "COMPLETING" ]]; then
+      active+=("${jid}")
+    else
+      echo "Job ${jid} finished with state: ${status:-unknown}"
+    fi
+  done
+  job_ids=("${active[@]+"${active[@]}"}")
+}
+
+# ---------------------------------------------------------------------------
+# Helper: wait until fewer than MAX_CONCURRENT jobs are active.
+# ---------------------------------------------------------------------------
+wait_for_slot() {
+  while [[ ${#job_ids[@]} -ge ${MAX_CONCURRENT} ]]; do
+    sleep 10
+    poll_jobs
+  done
+}
+
 # ---------------------------------------------------------------------------
 # Run each site
 # ---------------------------------------------------------------------------
 
+site_num=0
 for cs in "${SITES[@]}"; do
+  (( site_num++ )) || true
   echo
   echo "=================================================================="
-  echo "Preparing site: ${cs}"
+  echo "Preparing site: ${cs} (${site_num}/${#SITES[@]})"
   echo "=================================================================="
 
   # Generate site-specific ecLand and optional CaMa-Flood namelists.
@@ -383,8 +421,9 @@ for cs in "${SITES[@]}"; do
   check_restart_files
 
   if [[ "${LBATCH:-false}" == true ]]; then
-    # Submit one SLURM job per site. At most 20 jobs are submitted before
-    # waiting for the current group to complete.
+    # Wait until a slot is free, then submit.
+    wait_for_slot
+
     job_output=$(
       sbatch \
         --export="LAUNCH=mpirun -np 1,MEM_PER_CPU=${MEM_PER_CPU:-},cs=${cs},ECLAND_MASTER=${ECLAND_MASTER},WORK_DIR=${WORK_DIR},OUTPUT_DIR=${OUTPUT_DIR},FORCING_DIR=${FORCING_DIR},INICLM_DIR=${INICLM_DIR},FORCING_TYPE=${FORCING_TYPE},NLOOP=${NLOOP},NAMELIST=${NAMELIST},SCRIPTS_DIR=${SCRIPTS_DIR},LRESTART=${LRESTART},PATH=${ecland_ROOT:-../ecland_eclairs-build}/bin:${PATH}" \
@@ -397,34 +436,7 @@ for cs in "${SITES[@]}"; do
       continue
     fi
     job_ids+=("${job_id}")
-    echo "Submitted SLURM job ${job_id} for ${cs}"
-
-    if [[ ${#job_ids[@]} -eq 20 ]]; then
-      echo "Waiting for the current group of 20 jobs..."
-
-      for job_id in "${job_ids[@]}"; do
-        while true; do
-          job_status=$(
-            scontrol show job "${job_id}" 2>/dev/null |
-              awk -F'JobState=' 'NF > 1 {print $2}' |
-              awk '{print $1}'
-          )
-
-          if [[ "${job_status}" != "PENDING" &&
-                "${job_status}" != "RUNNING" &&
-                "${job_status}" != "CONFIGURING" &&
-                "${job_status}" != "COMPLETING" ]]; then
-            break
-          fi
-
-          sleep 10
-        done
-
-        echo "Job ${job_id} finished with state: ${job_status:-unknown}"
-      done
-
-      job_ids=()
-    fi
+    echo "Submitted SLURM job ${job_id} for ${cs} (active: ${#job_ids[@]}/${MAX_CONCURRENT} ; site ${site_num} of ${#SITES[@]})"
   else
     # Run interactively/directly on the current node.
     run_cmd=(
@@ -451,27 +463,10 @@ done
 # ---------------------------------------------------------------------------
 
 if [[ "${LBATCH:-false}" == true && ${#job_ids[@]} -gt 0 ]]; then
-  for job_id in "${job_ids[@]}"; do
-    echo "Waiting for job ${job_id}..."
-
-    while true; do
-      job_status=$(
-        scontrol show job "${job_id}" 2>/dev/null |
-          awk -F'JobState=' 'NF > 1 {print $2}' |
-          awk '{print $1}'
-      )
-
-      if [[ "${job_status}" != "PENDING" &&
-            "${job_status}" != "RUNNING" &&
-            "${job_status}" != "CONFIGURING" &&
-            "${job_status}" != "COMPLETING" ]]; then
-        break
-      fi
-
-      sleep 10
-    done
-
-    echo "Job ${job_id} finished with state: ${job_status:-unknown}"
+  echo "Waiting for ${#job_ids[@]} remaining job(s) to finish..."
+  while [[ ${#job_ids[@]} -gt 0 ]]; do
+    sleep 10
+    poll_jobs
   done
 fi
 
