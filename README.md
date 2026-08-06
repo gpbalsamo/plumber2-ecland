@@ -1,6 +1,7 @@
 # plumber2-ecland
 
-Scripts and configuration to run [ecLand](https://www.ecmwf.int/en/research/modelling-systems/land-surface) land-surface model simulations over the [PLUMBER2](https://gmd.copernicus.org/articles/15/5511/2022/) benchmark sites.
+Scripts and configuration to run [ecLand](https://www.ecmwf.int/en/research/modelling-systems/land-surface) land-surface model simulations over the [PLUMBER2](https://gmd.copernicus.org/articles/15/5511/2022/) 170 sites.
+![PLUMBER2 site locations](plumber2_sites_map.png)
 
 ## Repository layout
 
@@ -91,7 +92,7 @@ python3 scripts/check_plumber2_dates.py
 
 ## Benchmarking
 
-A curated list of 42 recommended benchmark sites (selected by Gab Abramowitz) is provided in `scripts/best_sites_to_benchmark.txt`. These sites offer good spatial and biome diversity and are suitable for model evaluation.
+A curated list of 42 recommended benchmark sites (selected by Gab) is provided in `scripts/best_sites_to_benchmark.txt`. These sites offer good spatial and biome diversity and are suitable for model evaluation.
 
 To run ecLand only over the benchmark sites:
 
