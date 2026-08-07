@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH -n 1
-#SBATCH -t 1:00:00
+#SBATCH -t 4:00:00
 
 module load prgenv/intel intel/2021.4 python3/3.10.10-01
 module load hpcx-openmpi/2.9 netcdf4/4.9.1
