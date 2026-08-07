@@ -23,8 +23,11 @@ Clone the repository with Git LFS support so that the NetCDF pointer files are f
 
 ```bash
 # Install Git LFS if not already available
+# brew install git-lfs
 git lfs install
+```
 
+```bash
 # Clone the repository
 git clone git@github.com:gpbalsamo/plumber2-ecland.git
 cd plumber2-ecland
