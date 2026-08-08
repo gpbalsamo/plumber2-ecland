@@ -33,11 +33,7 @@ git clone git@github.com:gpbalsamo/plumber2-ecland.git
 cd plumber2-ecland
 ```
 
-The `forcing/PLUMBER2/` and `clim/PLUMBER2/` directories contain LFS pointers after cloning. Run the following to download the actual NetCDF files:
-
-```bash
-bash scripts/ecland_retrieve_lfs.sh --all
-```
+The `forcing/PLUMBER2/` and `clim/PLUMBER2/` directories contain LFS pointers after cloning.
 
 ## Requirements
 

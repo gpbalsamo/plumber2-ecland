@@ -248,13 +248,23 @@ def process_site(site: Path, output: Path, overwrite: bool, strict: bool, compre
         out['longitude'] = xr.DataArray(np.float32(lon if lon is not None else FILL), attrs={
             'long_name': 'latitude of the site', 'units': 'degrees_east', 'comments': 'none'})
 
+        # Split site name into code and period: e.g. "AR-SLu_2010-2010" -> "AR-SLu" + "2010-2010"
+        site_full = site.name
+        if '_' in site_full:
+            site_code, site_period = site_full.rsplit('_', 1)
+        else:
+            site_code, site_period = site_full, ''
+        out['site_period'] = xr.DataArray(np.bytes_(site_period), attrs={
+            'long_name': 'simulation period (start_year-end_year)', 'comments': 'none'})
+
         for name, meta in SCHEMA.items():
             out[name].attrs = {'long_name': meta['long_name'], 'units': meta['units'], 'comments': meta.get('comments', 'none')}
         out['time'].attrs = {'long_name': 'time'}
         out.attrs = {
             'history': f'Created {datetime.now(timezone.utc).isoformat()}',
             'creation': 'postproc_plumber2.py',
-            'site': site.name,
+            'site': site_code,
+            'period': site_period,
             'model': 'ecLand',
             'experiment': 'PLUMBER2',
             'source_directory': str(site),
@@ -267,6 +277,7 @@ def process_site(site: Path, output: Path, overwrite: bool, strict: bool, compre
         encoding['SoilLev'] = {'dtype': 'float32', '_FillValue': FILL}
         encoding['latitude'] = {'dtype': 'float32', '_FillValue': FILL}
         encoding['longitude'] = {'dtype': 'float32', '_FillValue': FILL}
+        encoding['site_period'] = {'_FillValue': None}
         encoding['level'] = {'dtype': 'int32'}
         # Preserve ecLand's decoded time values but write the established units.
         if np.issubdtype(out['time'].dtype, np.datetime64):
