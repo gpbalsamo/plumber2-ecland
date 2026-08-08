@@ -56,13 +56,13 @@ scripts/ecland_retrieve_lfs.sh --all
 
 ### 2. Run experiment and postprocess output
 
-Edit `scripts/run_and_proc_plumber2.sh` to set paths and options, then:
+Edit `scripts/run_and_proc_plumber2.sh` to set paths and options to run with your local installation, then:
 
 ```bash
 bash scripts/run_and_proc_plumber2.sh
 ```
 
-Note this script runs in batch a lower-level script (permitting 25 sites simulations in parallel to speed-up), however it can be run also directly:
+Note this script runs on an HPC in batch a lower-level script (permitting 25 sites simulations in parallel to speed-up), however it can be run also directly:
 
 ```bash
 scripts/ecland_run_experiment.sh \

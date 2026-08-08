@@ -26,7 +26,10 @@
 
 set -eu
 set -o pipefail
-module load hpcx-openmpi/2.9.0
+if command -v module >/dev/null 2>&1; then
+  echo "HPC module exists - load openmpi"
+  module load hpcx-openmpi/2.9.0 || true
+fi
 
 # ---------------------------------------------------------------------------
 # Utility functions
