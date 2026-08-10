@@ -54,7 +54,7 @@ SCHEMA: dict[str, dict[str, Any]] = {
 }
 
 MAPPINGS = (
-    ('o_co2.nc', 'CO2flux', 'NEE', None), ('o_co2.nc', 'Ag', 'GPP', 'negate'),
+    ('o_co2.nc', 'CO2flux', 'NEE', 'negate'), ('o_co2.nc', 'Ag', 'GPP', None),
     ('o_efl.nc', 'Qg', 'Qg', None), ('o_efl.nc', 'Qgsn', 'Qgs', None),
     ('o_efl.nc', 'Qle', 'Qle', 'negate'), ('o_efl.nc', 'Qfsn', 'Qfsn', None),
     ('o_efl.nc', 'Qh', 'Qh', 'negate'), ('o_efl.nc', 'LWup', 'LWup', 'negate'),
