@@ -452,9 +452,9 @@ for cs in "${SITES[@]}"; do
       -i "${INICLM_DIR}"
       -F "${FORCING_TYPE}"
       -n "${NAMELIST}"
-      "${NAMELIST_CMF_OPT[@]}"
+      "${NAMELIST_CMF_OPT[@]+"${NAMELIST_CMF_OPT[@]}"}"
       -l "${NLOOP}"
-      "${PARAM_FILE_OPT[@]}"
+      "${PARAM_FILE_OPT[@]+"${PARAM_FILE_OPT[@]}"}"
       -R "${LRESTART}"
     )
     trace "${run_cmd[@]}"
