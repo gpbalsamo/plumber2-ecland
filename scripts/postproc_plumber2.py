@@ -28,6 +28,7 @@ SCHEMA: dict[str, dict[str, Any]] = {
     'LWup': {'dims': ('time',), 'long_name': 'surface upwelling longwave radiation', 'units': 'W m-2'},
     'SWup': {'dims': ('time',), 'long_name': 'surface upwelling shortwave radiation', 'units': 'W m-2'},
     'SWnet': {'dims': ('time',), 'long_name': 'surface net shortwave radiation', 'units': 'W m-2'},
+    'Rnet': {'dims': ('time',), 'long_name': 'surface net radiation', 'units': 'W m-2', 'comments': 'SWnet + LWnet'},
     'Evap': {'dims': ('time',), 'long_name': 'total water vapour flux from the surface to the atmosphere', 'units': 'kg m-2 s-1'},
     'ESoil': {'dims': ('time',), 'long_name': 'evaporation and sublimation from soil', 'units': 'kg m-2 s-1'},
     'Qsb': {'dims': ('time',), 'long_name': 'subsurface runoff', 'units': 'kg m-2 s-1'},
@@ -226,6 +227,13 @@ def process_site(site: Path, output: Path, overwrite: bool, strict: bool, compre
             if not da['time'].identical(time):
                 da = da.reindex(time=time)
             vars_out['SWup'] = da.transpose('time').astype(np.float32)
+
+        # Derived Rnet = SWnet + LWnet.
+        if efl is not None and 'SWnet' in efl and 'LWnet' in efl:
+            da = squeeze_site((efl['SWnet'] + efl['LWnet']).copy(deep=True))
+            if not da['time'].identical(time):
+                da = da.reindex(time=time)
+            vars_out['Rnet'] = da.transpose('time').astype(np.float32)
 
         # Fill any unavailable target variable explicitly.
         for name, meta in SCHEMA.items():
