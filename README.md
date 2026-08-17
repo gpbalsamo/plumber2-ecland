@@ -1,6 +1,6 @@
 # plumber2-ecland
 
-Scripts and configuration to run [ecLand](https://www.ecmwf.int/en/research/modelling-systems/land-surface) land-surface model simulations over the [PLUMBER2](https://gmd.copernicus.org/articles/15/5511/2022/) 170 sites.
+Scripts and configuration to run [ecLand](https://www.ecmwf.int/en/research/modelling-systems/land-surface) land-surface model simulations over the [PLUMBER2](https://essd.copernicus.org/articles/14/449/2022/) 170 sites.
 ![PLUMBER2 site locations](plumber2_sites_map.png)
 
 Forcing and evaluation data are the PLUMBER2 v1.0 release: Ukkola, A. M., Abramowitz, G., and De Kauwe, M. G. (2022), *A flux tower dataset tailored for land model evaluation*, Earth Syst. Sci. Data, 14, 449–461, https://doi.org/10.5194/essd-14-449-2022, distributed via the [NCI THREDDS catalogue](https://thredds.nci.org.au/thredds/catalog/ks32/CLEX_Data/PLUMBER2/v1-0/catalog.html).
@@ -13,7 +13,7 @@ plumber2-ecland/
 ├── forcing/PLUMBER2/       # Meteorological forcing, ecLand-ready (NetCDF, tracked via Git LFS)
 ├── forcing/PLUMBER2_original/  # Raw PLUMBER2 v1.0 Met download — source for forcing/PLUMBER2/
 ├── flux/PLUMBER2_original/ # Raw PLUMBER2 v1.0 Flux (observed) download — used by the benchmark
-├── namelists/              # ecLand namelist configuration files
+├── namelists/              # ecLand namelist configuration files (control + experiment variants)
 ├── scripts/                # Run, post-processing, download and benchmark scripts
 │   ├── all_sites_plumber2.txt       # Complete list of 170 PLUMBER2 sites
 │   ├── best_sites_to_benchmark.txt  # Curated list of 42 benchmark sites
@@ -22,11 +22,17 @@ plumber2-ecland/
 │   ├── regenerate_plumber2_forcing.sh  # Rebuild forcing/PLUMBER2/ from forcing/PLUMBER2_original/
 │   ├── run_parallel_local_macos.sh  # Run all/some sites concurrently on a local Mac
 │   ├── postproc_plumber2.py         # Post-process raw ecLand output into the PLUMBER2 schema
-│   └── benchmark_plumber2.py        # Score postprocessed output against Flux observations + dashboard
+│   ├── benchmark_plumber2.py        # Score postprocessed output against Flux observations + dashboard
+│   ├── dashboard_template.html      # Self-contained dashboard template used by benchmark_plumber2.py
+│   └── plot_sites_map.py            # Render plumber2_sites_map.png (site locations, colored by biome)
 ├── output/                 # Model output — excluded from git
 ├── postprocessed/          # Post-processed output — excluded from git
-└── benchmark/              # Benchmark metrics, JSON payload and dashboard HTML (checked in)
-    └── best42/              # Same pipeline restricted to the 42 curated benchmark sites
+└── benchmark/
+    ├── models/<model-name>/     # Postprocessed per-experiment output, e.g. ecland_cy50r1,
+    │                             # ecland_cy50r1_runoff_fix — excluded from git (regenerable, ~GBs)
+    └── dashboards/<model-name>/ # Benchmark metrics/JSON/dashboard per experiment (checked in)
+        ├── all170/               # Full 170-site run: metrics.csv, data.json, index.html
+        └── best42/               # Same, restricted to the 42 curated benchmark sites
 ```
 
 ## Getting started
@@ -156,21 +162,33 @@ python3 scripts/check_plumber2_dates.py
 
 ### Obs-vs-model benchmark dashboard
 
-`scripts/benchmark_plumber2.py` scores postprocessed ecLand output (`postprocessed/`) against the observed PLUMBER2 v1.0 flux data (`flux/PLUMBER2_original/`, see [Downloading the raw PLUMBER2 data](#downloading-the-raw-plumber2-data)) for `Qle`, `Qh` and `NEE`, using only quality-controlled (measured, non-gapfilled) observation half-hours. For each site it computes bias/RMSE/R/NME plus compact monthly-climatology, seasonal-diurnal and long-term-trend aggregates, then builds a self-contained interactive dashboard (`scripts/dashboard_template.html`) with a pannable/zoomable site map, Taylor diagram, per-biome skill breakdown, a searchable/sortable ranked table, and a per-site drill-down.
+`scripts/benchmark_plumber2.py` scores a postprocessed model run against the observed PLUMBER2 v1.0 flux data (`flux/PLUMBER2_original/`, see [Downloading the raw PLUMBER2 data](#downloading-the-raw-plumber2-data)) for `Qle`, `Qh` and `NEE`, using only quality-controlled (measured, non-gapfilled) observation half-hours. For each site it computes bias/RMSE/R/NME plus compact monthly-climatology, seasonal-diurnal and long-term-trend aggregates, then builds a self-contained interactive dashboard (`scripts/dashboard_template.html`) with a pannable/zoomable site map, Taylor diagram, per-biome skill breakdown (fixed 0.0–1.0 NME axis, so different runs are visually comparable), a searchable/sortable ranked table, and a per-site drill-down.
+
+It's model-agnostic: any directory of per-site NetCDF files works as `--model-dir`, whether named in the PLUMBER2-schema convention (`ecLand_PLUMBER2_<site>_<period>.nc`) or a site-only convention with no period in the filename (`*.{SITE}.nc`, e.g. JULES output), and it scores whichever of `Qle`/`Qh`/`NEE` the model actually provides — a model missing a variable (e.g. no `NEE`) just shows that cell as unavailable rather than failing. Time matching is robust to imprecise time encoding (some models store time as float32, which drifts over multi-year records) by reconstructing a clean, uniformly-spaced axis rather than trusting stored timestamps directly.
+
+Convention: keep each model/experiment's postprocessed output under its own `benchmark/models/<model-name>/` directory (e.g. `ecland_cy50r1` for the control run, `ecland_cy50r1_runoff_fix` for a namelist variant, `JULESGL9` for a different model entirely) so multiple runs can be compared side by side.
 
 ```bash
-# Full 170-site benchmark
-python3 scripts/benchmark_plumber2.py
+# Full 170-site benchmark -> benchmark/dashboards/<model-name>/all170/
+python3 scripts/benchmark_plumber2.py \
+  --model-dir benchmark/models/<model-name> \
+  --out-dir benchmark/dashboards/<model-name>
 
-# Restrict to a curated subset (e.g. the 42 benchmark sites)
-python3 scripts/benchmark_plumber2.py --sites-file scripts/best_sites_to_benchmark.txt --out-dir benchmark/best42
+# Restrict to a curated subset (e.g. the 42 benchmark sites) -> .../best42/
+python3 scripts/benchmark_plumber2.py \
+  --model-dir benchmark/models/<model-name> \
+  --out-dir benchmark/dashboards/<model-name> \
+  --sites-file scripts/best_sites_to_benchmark.txt
 ```
 
-`--flux-dir` / `--model-dir` / `--out-dir` override the default `flux/PLUMBER2_original/`, `postprocessed/` and `benchmark/` locations; `--site` filters to one or more specific sites. Each run writes a metrics CSV, a JSON payload, and `plumber2_benchmark_dashboard.html` — open the HTML directly in a browser, no server required. `benchmark/` (full 170-site run) and `benchmark/best42/` (42-site curated subset) are checked in as worked examples.
+`--out-dir` is a base path: the script automatically routes output into `<out-dir>/all170/` or `<out-dir>/best42/` depending on whether `--sites-file` is given, so the same `--out-dir` works for both commands above. `--flux-dir` overrides the default `flux/PLUMBER2_original/`; `--site` filters to one or more specific sites. Each run writes a metrics CSV, a JSON payload, and `index.html` (named so uploading the output folder to a static host opens the dashboard automatically) — open it directly in a browser, no server required. `benchmark/dashboards/` is checked in with worked examples for the control run, the runoff-fix variant, and JULESGL9.
 
 ## Namelist
 
-The default namelist `namelists/namelist_ecland_50R1_ctl` corresponds to the ecLand 50R1 control configuration.
+- `namelists/namelist_ecland_50R1_ctl` — the ecLand 50R1 control configuration (the default used by `ecland_run_experiment.sh` when `-n` is omitted).
+- `namelists/namelist_ecland_50R1_runoff_fix` — the control namelist with `&NAMPARSOIL` `RSIGORMIN`/`RSIGORMAX` (surface-runoff orography coefficient bounds) set for the runoff fix, rather than left at their compiled defaults (100.0 / 1000.0). Pass it via `-n namelists/namelist_ecland_50R1_runoff_fix` to `ecland_run_experiment.sh`, or `-n` to `run_parallel_local_macos.sh`.
+
+New namelist variants should follow this naming pattern (`namelist_ecland_50R1_<variant>`) and pair with a matching `benchmark/models/ecland_cy50r1_<variant>/` output directory (see [Benchmarking](#benchmarking)) so runs stay easy to tell apart.
 
 ## License
 

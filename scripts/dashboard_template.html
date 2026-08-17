@@ -722,9 +722,10 @@
 
     const W=480, H=340, padL=48, padR=16, padT=10, rowH= (H-padT-30)/Math.max(1,cats.length);
     const allNme = rows.map(r=>r.nme).sort((a,b)=>a-b);
-    const trueMax = allNme[allNme.length-1] || 1;
-    const cap = Math.max(quantile(allNme, 0.92) * 1.15, cats[0] ? cats[0].q3*1.3 : 1) || 1;
-    const maxVal = Math.min(trueMax, cap) || 1;
+    const trueMax = allNme.length ? allNme[allNme.length-1] : 1;
+    // Fixed 0.0-1.0 axis (rather than data-driven) so NME is visually comparable
+    // across different model/site-set dashboards.
+    const maxVal = 1.0;
     const clipped = trueMax > maxVal * 1.001;
     const x = v => padL + (Math.min(v,maxVal)/maxVal)*(W-padL-padR);
 

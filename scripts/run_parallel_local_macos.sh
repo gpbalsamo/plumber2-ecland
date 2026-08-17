@@ -37,24 +37,30 @@ JOBS=4
 SITE_LIST_FILE="${SCRIPT_DIR}/all_sites_plumber2.txt"
 ECLAND_MASTER="${ECLAND_MASTER:-/Users/pad/Work/ecland/build/bin/ecland-master-dp}"
 LOG_DIR="${PROJECT_ROOT}/scripts/work/parallel_logs"
+NAMELIST=""
 
 usage() {
   cat <<EOF
-Usage: $(basename "$0") [-j JOBS] [-S SITE_LIST_FILE] [-x ECLAND_MASTER]
+Usage: $(basename "$0") [-j JOBS] [-S SITE_LIST_FILE] [-x ECLAND_MASTER] [-n NAMELIST]
 
   -j JOBS             Concurrent site runs (default: ${JOBS})
   -S SITE_LIST_FILE   One site per line (default: all 170 sites)
   -x ECLAND_MASTER    Path to the ecland executable
                        (default: \$ECLAND_MASTER or ${ECLAND_MASTER})
+  -n NAMELIST         Namelist file, forwarded to ecland_run_experiment.sh -n
+                       (default: ecland_run_experiment.sh's own default, the 50R1 control namelist).
+                       Output always goes to output/ -- move/copy postprocessed results under
+                       benchmark/models/<name>/ to keep experiments separate.
   -h                   Show this help
 EOF
 }
 
-while getopts ":hj:S:x:" opt; do
+while getopts ":hj:S:x:n:" opt; do
   case "${opt}" in
     j) JOBS="${OPTARG}" ;;
     S) SITE_LIST_FILE="${OPTARG}" ;;
     x) ECLAND_MASTER="${OPTARG}" ;;
+    n) NAMELIST="${OPTARG}" ;;
     h) usage; exit 0 ;;
     \?) echo "ERROR: invalid option -${OPTARG}" >&2; usage >&2; exit 2 ;;
     :) echo "ERROR: option -${OPTARG} requires an argument" >&2; usage >&2; exit 2 ;;
@@ -76,6 +82,7 @@ n_sites=$(grep -c . "${SITE_LIST_FILE}")
 echo "Sites      : ${n_sites} (from ${SITE_LIST_FILE})"
 echo "Workers    : ${JOBS}"
 echo "Executable : ${ECLAND_MASTER}"
+echo "Namelist   : ${NAMELIST:-(default)}"
 echo "Logs       : ${LOG_DIR}/<site>.log"
 echo
 
@@ -87,9 +94,12 @@ run_one() {
   local site="$1"
   local log="${LOG_DIR}/${site}.log"
   local t0 t1
+  local extra_args=()
+  [[ -n "${NAMELIST}" ]] && extra_args+=(-n "${NAMELIST}")
   t0=$(date +%s)
   if "${SCRIPT_DIR}/ecland_run_experiment.sh" \
       -g PLUMBER2 -t insitu -s "${site}" -x "${ECLAND_MASTER}" \
+      "${extra_args[@]+"${extra_args[@]}"}" \
       > "${log}" 2>&1; then
     t1=$(date +%s)
     echo "OK" > "${STATUS_DIR}/${site}"
@@ -101,7 +111,7 @@ run_one() {
   fi
 }
 export -f run_one
-export SCRIPT_DIR ECLAND_MASTER LOG_DIR STATUS_DIR
+export SCRIPT_DIR ECLAND_MASTER LOG_DIR STATUS_DIR NAMELIST
 
 start=$(date +%s)
 xargs -P "${JOBS}" -I{} bash -c 'run_one "$@"' _ {} < "${SITE_LIST_FILE}"

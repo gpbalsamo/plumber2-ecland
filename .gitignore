@@ -3,6 +3,7 @@ scripts/work/
 work/
 output/
 postprocessed/
+benchmark/models/
 results/
 logs/
 *.log
