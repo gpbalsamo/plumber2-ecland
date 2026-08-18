@@ -26,8 +26,23 @@
 from netCDF4 import Dataset,num2date
 import numpy as np
 import argparse
+import warnings
 from datetime import datetime
 import re
+
+
+def read_single_value(nc_var):
+    """Return a netCDF variable's single value regardless of its rank.
+
+    surfclim releases disagree on how the scalar site metadata is stored:
+    climate.v015 carries zphista/zuv as 2D (lat, lon) fields, climv21 as 0-d
+    scalars. Indexing that suits one raises IndexError on the other, so read
+    through a flattened view instead of assuming a shape.
+    """
+    values = np.ravel(np.asarray(nc_var[...]))
+    if values.size == 0:
+        raise ValueError(f"variable '{nc_var.name}' holds no values")
+    return float(values[0])
 
 
 def read_args():
@@ -163,7 +178,6 @@ if __name__ == "__main__":
         forcing_step = raw_step * 86400.0
     else:
         # Fallback: assume seconds and warn.
-        import warnings
         warnings.warn(f"Unrecognised time units '{time_units}'; assuming seconds.")
         forcing_step = raw_step
 
@@ -181,12 +195,23 @@ if __name__ == "__main__":
         nlon=len(forcingFile.dimensions['x'])
         ndimcdf=1
     if forcing_type=='insitu':
-      if 'lat' in climFile.dimensions:
-        zphista=climFile.variables['zphista'][0].data[0]
-        zuv=climFile.variables['zuv'][0].data[0]
-      else:
-        zphista=climFile.variables['zphista'][0].data
-        zuv=climFile.variables['zuv'][0].data
+      zphista=read_single_value(climFile.variables['zphista'])
+      zuv=read_single_value(climFile.variables['zuv'])
+
+      # The forcing file's reference_height is the flux tower's actual
+      # measurement height and so the authoritative reference level. Warn when
+      # the clim file disagrees rather than quietly running with a placeholder
+      # (some surfclim releases ship a constant 10 m for every site).
+      # scripts/align_clim_latlon.sh writes reference_height into the clim
+      # files' zphista/zuv to resolve this.
+      if 'reference_height' in forcingFile.variables:
+        ref_height=read_single_value(forcingFile.variables['reference_height'])
+        if ref_height > 0 and ref_height != -9999:
+          if abs(zphista-ref_height) > 0.01 or abs(zuv-ref_height) > 0.01:
+            warnings.warn(
+                f"{site}: surfclim zphista={zphista} zuv={zuv} disagree with the "
+                f"forcing reference_height={ref_height} m; the namelist will use "
+                f"the surfclim values. Run scripts/align_clim_latlon.sh to align them.")
     else:
       zphista=10.0
       zuv=10.0
