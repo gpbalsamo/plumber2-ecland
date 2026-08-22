@@ -10,8 +10,16 @@ logs/
 *.out
 *.err
 
+# Run root written by scripts/submit_ecland_slurm.sh when -O defaults to the
+# repository: output/, work/, logs/ and the queue state for one site group.
+# Anchored, so it cannot swallow benchmark/dashboards/ecland_*/ further down.
+/ecland_*/
+
 # Scheduler output
 slurm-*.out
+# ecsbatch writes ecsbatch.log.<jobid>, which the *.log pattern above does not
+# match because the job number trails the extension.
+ecsbatch.log.*
 
 # Python
 __pycache__/

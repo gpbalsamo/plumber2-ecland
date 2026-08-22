@@ -111,6 +111,151 @@ scripts/ecland_run_experiment.sh \
   -w <work_dir>
 ```
 
+#### Faster on the HPC: one job array draining a shared site queue
+
+`scripts/submit_ecland_slurm.sh` runs the whole group as a single SLURM job
+array instead of one job per site, which is the fast path on the ECMWF HPC.
+**Run it from the `$SCRATCH` mirror, not from here** — see
+[Working on `$SCRATCH`](#working-on-scratch) below, which is a hard requirement
+for concurrency above ~25, not a preference:
+
+```bash
+scripts/scratch_mirror.sh push
+cd ${SCRATCH}/plumber2-ecland
+scripts/submit_ecland_slurm.sh -i -x ${SCRATCH}/plumber2-ecland/ecland-build/bin/ecland-master-dp
+```
+
+The defaults are `-a 2 -w 30 -l 2 -T 02:00:00 -q nf -M 2G` — 60 concurrent sites
+from 2 SLURM job slots — finishing all 170 sites in **≈1.2 h**. Add `-d` for a
+dry run (writes and prints the job script, submits nothing).
+
+**Cost tracks timesteps, not years.** PLUMBER2 mixes half-hourly and hourly
+forcing, so a 17-year site measured 3106 s against 1835 s for a 21-year one.
+Fitted on 43 sites at `NLOOP=2`: **10.1 ms per timestep** (3.6% median error),
+×1.32 when 30 workers share a node. The group is 17.1 M timesteps, so a full run
+is **≈64 CPU-hours** and ~30 GB of raw output. The same law on FLUXNET Shuttle
+sites gives 194 s/site-year against 86 here — refit, never carry timings between
+the two repos.
+
+**Concurrency = `-a` × `-w`, and the two are not interchangeable.** The scarce
+resource is job slots, not CPUs: `sacctmgr show assoc user=$USER` gives
+**MaxJobs=30** per account on QoS `nf`, and array elements count individually, so
+element 31+ just sits in `PENDING (AssocMaxJobsLimit)`. `-w` runs several workers
+*inside* one element, buying concurrency from a node's CPUs (these nodes have
+256) instead of from that budget:
+
+| config | workers | full 170 | job slots | CPUs |
+|---|---|---|---|---|
+| `-a 25 -w 1` | 25 | 2.6 h | 25 of 30 | 25 |
+| **`-a 2 -w 30`** (default) | 60 | **1.23 h** | **2 of 30** | 60 |
+| `-a 5 -w 36` | 180 | 1.23 h | 5 of 30 | 180 |
+| `-a 5 -w 48` | 240 | 1.23 h | 5 of 30 | 240 |
+
+**60 workers is the number worth remembering for this group.** Everything at or
+above it finishes at the same **1.23 h**, because that is the floor: `FI-Hyy_1996-2014`
+(333,120 half-hourly timesteps) running alone, serial and unsplittable. Note the
+floor is *not* the longest record — US-Ha1 spans 21 years but hourly, so it is
+half the work. The larger shapes are correct for the sibling repo's 775 sites and
+oversized for 170; `-a 5 -w 48` starts 70 workers that never receive a site.
+Below the floor the only remaining lever is halving the work: `NLOOP=1` from an
+equilibrated restart.
+
+Two couplings to respect when changing these:
+
+- **Lower concurrency, raise `-T`.** A worker drains the queue rather than
+  running one site, so it lives ≈ total/N: 1.07 h at 60 workers, 2.13 h at 25 —
+  but never less than the costliest single site, 1.23 h. The `02:00:00` default
+  covers the 60-worker case; a limit below the drain kills every worker mid-queue
+  and records nothing, which cost 91 CPU-hours here once.
+- **Raise concurrency, move everything to Lustre.** Not just the output — see
+  below. `-M` is per CPU, so it multiplies by `-w`: at `8G`, `-w 36` would
+  reserve 288 GB of a 480 GB node for a run needing well under 2G per site.
+
+The array elements are interchangeable workers draining one shared queue of
+sites (`scripts/ecland_run_queue.sh`), not owners of a fixed slice. Sites are
+claimed with an atomic `mkdir`, so exactly one worker can win a given site, and
+each is run and recorded individually. That buys three things over the
+`LBATCH=true` path in `ecland_run_experiment.sh`, which submits one job per site
+and caps itself at `MAX_CONCURRENT=25` while a login-node poller waits on the
+set:
+
+- **Concurrency.** `-a` sites at once from one submission, with nothing left
+  alive on the login node, and no separate job queueing per site.
+- **Load balance.** The queue is ordered longest record first, so the 21-year
+  sites start before the 1-year ones and the tail is absorbed by the short
+  runs.
+- **Resumability.** A failure or a wall-limit kill costs one site, not a slice.
+  Completed output is seeded as done on the next submission, so re-submitting
+  picks up where it stopped; retry only the failures with
+  `grep -lx FAILED <run_root>/status/* | xargs rm`.
+
+Output, work dirs, logs and queue state go under `<-O>/ecland_<GROUP>/`, which
+defaults to the repository (so `ecland_PLUMBER2/output`, git-ignored) and leaves
+the existing `output/` untouched. Pass `-i` to make the run root the tree itself,
+so `output/` sits where postproc and benchmark expect it — the intended mode on
+the mirror. `-h` lists the rest (namelist, QoS, wall limit, memory, site subset,
+`%N` throttle). The script prints the matching `postproc_plumber2.py` command
+when it submits.
+
+#### Working on `$SCRATCH`
+
+`$PERM` is a single NFS filer; `$SCRATCH` is Lustre. Measured with 30 concurrent
+writers: **530 MB/s on `$PERM` against 4863 MB/s on `$SCRATCH`**, a factor of
+9.2. Reads matter as much as writes, because all workers inside one array element
+share that node's single NFS client — forcing, clim, and the executable's shared
+libraries included. So bulk work happens on `$SCRATCH` and only results come
+back:
+
+```bash
+scripts/scratch_mirror.sh push          # inputs + code + ecland-build -> $SCRATCH
+cd ${SCRATCH}/plumber2-ecland
+scripts/submit_ecland_slurm.sh -i -x $PWD/ecland-build/bin/ecland-master-dp
+python3 scripts/postproc_plumber2.py --inputdir output --outdir postprocessed
+python3 scripts/benchmark_plumber2.py
+cd -; scripts/scratch_mirror.sh pull    # postprocessed/ + benchmark/ -> $PERM
+```
+
+The mirror keeps this repository's layout, so every script works there unchanged.
+`push` sends `scripts`, `namelists`, `forcing`, `clim`, `flux` and
+`ecland-build/{bin,lib,lib64}`; `pull` returns **only** `postprocessed/` and
+`benchmark/{models,dashboards}`. Raw `output/` is never copied back — it is ~30 GB
+per campaign and regenerable. Neither direction uses `--delete`, so a stale mirror
+file is possible but a lost result is not. **`$SCRATCH` is pruned automatically**,
+so anything not pulled back is eventually gone; `scratch_mirror.sh status` shows
+both sides.
+
+The executable has to be mirrored too, not just the data: `ecland-master-dp`
+resolves five shared objects through an `$ORIGIN/../lib64` rpath, so `bin/` and
+`lib64/` travel together and the loader stops demand-paging them over NFS.
+
+#### Two environment settings the array run depends on
+
+The generated job script exports these, and the run is ~15× slower without them:
+
+- **`OMPI_MCA_hwloc_base_binding_policy=none`.** ecLand calls `MPI_Init` even for
+  one point, so running the binary directly makes it an OpenMPI *singleton* — and
+  a singleton still applies the default binding policy, pinning itself to the
+  first core of the cgroup. Every worker then picks the *same* core: measured with
+  `-w 30`, 30 runnable processes on `Cpus_allowed_list=0,128` at 7% CPU each.
+  Dropping `mpirun` does not help, because the binding comes from the MPI runtime
+  inside the process, not the launcher.
+- **`OMP_NUM_THREADS=1`.** ecLand is threaded (`-nt` in
+  `ecland_parse_commandline.sh`) and OpenMP otherwise takes every CPU in the
+  cgroup, so `-w 30` would mean 30 workers × 30 spin-waiting threads.
+
+To check a live run is healthy (`comm` is truncated to 15 characters, so
+`pgrep -f ecland-master-dp` finds nothing — use `ps -C ecland-master-d`):
+
+```bash
+srun --overlap --jobid=<JOBID> -n1 bash -c \
+  'grep Cpus_allowed_list /proc/$(ps -o pid= -C ecland-master-d | head -1)/status
+   ps -o psr= -C ecland-master-d | sort -u | wc -l'
+```
+
+The mask should be the full cgroup and the CPU count should equal `-w`. Two CPUs
+means the binding bug. Note `ps -o pcpu` is a lifetime average and reads low
+during start-up, so sample `/proc/PID/stat` twice rather than trusting it.
+
 The postprocessing of model output is done by `scripts/postproc_plumber2.py`, which maps raw ecLand output onto the common PLUMBER2 variable schema (`Qle`, `Qh`, `NEE`, `GPP`, soil moisture/temperature profiles, etc.), including the derived `SWup` and `Rnet` (= `SWnet` + `LWnet`) radiation terms:
 
 ```bash
