@@ -2,14 +2,14 @@
 
 # One worker draining a shared queue of sites, running ecLand on each.
 #
-# WHY A QUEUE RATHER THAN A SLICE PER WORKER. Runtime scales with record
-# length, and the 170 PLUMBER2 sites run from 1 to 21 years (1040 site-years in
-# total, median 4). Hand each worker a fixed slice and the finish time is set by
-# whichever worker draws the worst combination; draining one shared queue
-# instead means a worker that finishes a 1-year site immediately takes another,
-# so the makespan falls to max(total/N, longest single site) -- 2.26 h at the
-# default 25 workers, within 1% of the ideal 2.24 h, against a 1.13 h floor set
-# by the longest record.
+# WHY A QUEUE RATHER THAN A SLICE PER WORKER. Runtime scales with the number of
+# forcing timesteps, and the 170 PLUMBER2 sites span 128 s to 4178 s per site
+# (median 1002 s). Hand each worker a fixed slice and the finish time is set by
+# whichever worker draws the worst combination; draining one shared queue instead
+# means a worker that finishes a cheap site immediately takes another, so the
+# makespan falls to max(total/N, costliest single site). Measured over a complete
+# run at 60 workers: 69 minutes for 63 CPU-hours, against a 1.16 h floor set by
+# FI-Hyy_1996-2014 alone.
 #
 # WHY THIS IS ALSO SAFER THAN A SLICE. Each site is claimed, run and recorded
 # individually:
@@ -24,12 +24,13 @@
 #     array skips what is done, and retrying the failures is
 #     `grep -lx FAILED status/* | xargs rm` and submit again.
 #
-# A worker interrupted mid-site (wall limit, node failure) leaves a claim with
-# no status. That is deliberate: the submitter sweeps such claims before the
-# next submission, so an interruption costs one site rather than a slice, and
-# the site is retried. Note that a worker lives for the whole DRAIN, not for one
-# site -- roughly total/N -- so the wall limit has to cover that, not just the
-# longest record; see "WALL LIMIT" in submit_ecland_slurm.sh.
+# A worker interrupted mid-site (wall limit, node failure) leaves a claim with no
+# status. Any still-running worker reclaims it on a later pass, by checking the
+# owning job against squeue -- see "PASSES" below -- and the submitter's sweep is
+# the fallback for whatever was orphaned after the last worker exited. Either way
+# an interruption costs one site rather than a slice. Note that a worker lives for
+# the whole DRAIN, not for one site -- roughly total/N -- so the wall limit has to
+# cover that, not just the costliest record; see submit_ecland_slurm.sh.
 #
 # This is the array-job counterpart to the LBATCH=true path in
 # ecland_run_experiment.sh, which submits one job per site and caps itself at
@@ -111,13 +112,50 @@ echo "worker ${WORKER} on $(hostname): draining $(grep -c . "${QUEUE_FILE}") sit
 # one -- measured, 30 workers completing exactly one site each. FD 9 puts the
 # queue out of reach of anything a child does with descriptor 0, and </dev/null
 # means a child that reads stdin gets EOF rather than another worker's data.
+#
+# PASSES, not one sweep. A worker re-reads the queue until a whole pass claims
+# nothing, because a single pass leaves two holes: a site whose worker died
+# mid-run stays claimed for the rest of the run and has to wait for the next
+# submission, and a worker joining late walks a fully-claimed queue and exits
+# immediately instead of helping. Both were observed. Passes are cheap when there
+# is nothing to do -- a stat per site -- and the loop still terminates promptly,
+# since a pass that claims nothing means every remaining site is either done or
+# held by a live worker.
+pass=0
+while : ; do
+  pass=$((pass + 1))
+  n_claimed_pass=0
+  # One snapshot per pass rather than a squeue call per site: with 60 workers and
+  # 170 sites the latter would be tens of thousands of queries.
+  live_jobs=" $(squeue -h -u "${USER}" -o '%A %i' 2>/dev/null | tr '\n' ' ') "
+
 while read -r -u 9 site; do
   [[ -n "${site}" ]] || continue
   [[ -f "${STATUS_DIR}/${site}" ]] && { n_skip=$((n_skip + 1)); continue; }
 
+  # A claim whose owning job is gone is stale by definition: nothing is running
+  # it. Reclaim by RENAMING the claim aside first -- rename is atomic and fails
+  # for everyone but one worker, so two workers cannot both decide a claim is
+  # stale and both proceed to run the site. A plain rm here would race.
+  if [[ -d "${CLAIM_DIR}/${site}" ]]; then
+    owner_job="$(awk '{print $1}' "${CLAIM_DIR}/${site}/owner" 2>/dev/null || true)"
+    if [[ -n "${owner_job}" && "${owner_job}" != "local" \
+          && "${live_jobs}" != *" ${owner_job} "* ]]; then
+      if mv "${CLAIM_DIR}/${site}" "${CLAIM_DIR}/.stale_${site}_$$" 2>/dev/null; then
+        rm -rf "${CLAIM_DIR}/.stale_${site}_$$"
+        echo "reclaimed ${site} from dead job ${owner_job}"
+      else
+        n_skip=$((n_skip + 1)); continue
+      fi
+    else
+      n_skip=$((n_skip + 1)); continue
+    fi
+  fi
+
   # Atomic across every worker and node: exactly one mkdir can succeed.
   mkdir "${CLAIM_DIR}/${site}" 2>/dev/null || { n_skip=$((n_skip + 1)); continue; }
   echo "${SLURM_JOB_ID:-local} $(hostname) $(date -u +%FT%TZ)" > "${CLAIM_DIR}/${site}/owner"
+  n_claimed_pass=$((n_claimed_pass + 1))
 
   t0=$(date +%s)
   status="FAILED"
@@ -147,4 +185,13 @@ while read -r -u 9 site; do
   echo "[$(date '+%H:%M:%S')] ${status} ${site} ($(( t1 - t0 ))s, attempt ${attempt})"
 done 9< "${QUEUE_FILE}"
 
-echo "worker ${WORKER} done in $(( $(date +%s) - start ))s: ${n_ok} ok, ${n_fail} failed, ${n_skip} skipped/claimed elsewhere"
+  [[ "${n_claimed_pass}" -eq 0 ]] && break
+  echo "worker ${WORKER} finished pass ${pass} (${n_claimed_pass} sites claimed); re-reading the queue"
+done
+
+# NOTE on the one hole this does not close: if the LAST live worker dies mid-site,
+# nobody is left to reclaim it, so that site waits for the next submission, which
+# sweeps it. Keeping workers alive to cover it would mean idling up to N-1 of them
+# for the length of the longest tail site -- about 60 CPU-hours here -- so exiting
+# when a pass claims nothing is the better trade.
+echo "worker ${WORKER} done in $(( $(date +%s) - start ))s over ${pass} pass(es): ${n_ok} ok, ${n_fail} failed, ${n_skip} skipped/claimed elsewhere"

@@ -125,17 +125,26 @@ cd ${SCRATCH}/plumber2-ecland
 scripts/submit_ecland_slurm.sh -i -x ${SCRATCH}/plumber2-ecland/ecland-build/bin/ecland-master-dp
 ```
 
-The defaults are `-a 2 -w 30 -l 2 -T 02:00:00 -q nf -M 2G` — 60 concurrent sites
-from 2 SLURM job slots — finishing all 170 sites in **≈1.2 h**. Add `-d` for a
-dry run (writes and prints the job script, submits nothing).
+The defaults are `-a 2 -w 30 -l 2 -T 02:30:00 -q nf -M 2G` — 60 concurrent sites
+from 2 SLURM job slots. Add `-d` for a dry run (writes and prints the job script,
+submits nothing).
+
+Measured on a complete 170-site run at `NLOOP=2`:
+
+| | |
+|---|---|
+| Wall clock | **69 min** |
+| CPU time | **63 CPU-hours** |
+| Raw output | **131 GB** (~770 MB per site) |
+| Failures | 0 / 170 |
+| Per-site | median 1002 s, min 128 s, max 4178 s (`FI-Hyy_1996-2014`) |
 
 **Cost tracks timesteps, not years.** PLUMBER2 mixes half-hourly and hourly
-forcing, so a 17-year site measured 3106 s against 1835 s for a 21-year one.
-Fitted on 43 sites at `NLOOP=2`: **10.1 ms per timestep** (3.6% median error),
-×1.32 when 30 workers share a node. The group is 17.1 M timesteps, so a full run
-is **≈64 CPU-hours** and ~30 GB of raw output. The same law on FLUXNET Shuttle
-sites gives 194 s/site-year against 86 here — refit, never carry timings between
-the two repos.
+forcing, so a 17-year site took 3106 s against 1835 s for a 21-year one. Over all
+170 sites the law is **14.0 ms per timestep** (6.8% median error, no useful
+intercept) on 17.1 M timesteps. The same fit on FLUXNET Shuttle sites gives
+194 s/site-year against 86 here — refit, never carry timings between the two
+repos.
 
 **Concurrency = `-a` × `-w`, and the two are not interchangeable.** The scarce
 resource is job slots, not CPUs: `sacctmgr show assoc user=$USER` gives
@@ -146,14 +155,18 @@ element 31+ just sits in `PENDING (AssocMaxJobsLimit)`. `-w` runs several worker
 
 | config | workers | full 170 | job slots | CPUs |
 |---|---|---|---|---|
-| `-a 25 -w 1` | 25 | 2.6 h | 25 of 30 | 25 |
-| **`-a 2 -w 30`** (default) | 60 | **1.23 h** | **2 of 30** | 60 |
-| `-a 5 -w 36` | 180 | 1.23 h | 5 of 30 | 180 |
-| `-a 5 -w 48` | 240 | 1.23 h | 5 of 30 | 240 |
+| `-a 25 -w 1` | 25 | 2.54 h | 25 of 30 | 25 |
+| **`-a 2 -w 30`** (default) | 60 | **1.16 h** | **2 of 30** | 60 |
+| `-a 5 -w 36` | 180 | 1.16 h | 5 of 30 | 180 |
+| `-a 5 -w 48` | 240 | 1.16 h | 5 of 30 | 240 |
+
+(Simulated from the measured per-site costs; the observed run finished in 69 min,
+within a minute of the 60-worker figure.)
 
 **60 workers is the number worth remembering for this group.** Everything at or
-above it finishes at the same **1.23 h**, because that is the floor: `FI-Hyy_1996-2014`
-(333,120 half-hourly timesteps) running alone, serial and unsplittable. Note the
+above it finishes at the same **1.16 h**, because that is the floor:
+`FI-Hyy_1996-2014` (333,120 half-hourly timesteps, measured at 4178 s) running
+alone, serial and unsplittable. Note the
 floor is *not* the longest record — US-Ha1 spans 21 years but hourly, so it is
 half the work. The larger shapes are correct for the sibling repo's 775 sites and
 oversized for 170; `-a 5 -w 48` starts 70 workers that never receive a site.
@@ -163,10 +176,11 @@ equilibrated restart.
 Two couplings to respect when changing these:
 
 - **Lower concurrency, raise `-T`.** A worker drains the queue rather than
-  running one site, so it lives ≈ total/N: 1.07 h at 60 workers, 2.13 h at 25 —
-  but never less than the costliest single site, 1.23 h. The `02:00:00` default
-  covers the 60-worker case; a limit below the drain kills every worker mid-queue
-  and records nothing, which cost 91 CPU-hours here once.
+  running one site, so it lives ≈ total/N: 1.05 h at 60 workers, 2.5 h at 25 —
+  but never less than the costliest single site, 1.16 h. The `02:30:00` default
+  clears that with margin; the measured run took 69 min, so the earlier
+  `02:00:00` was within 10 minutes of killing it. A limit below the drain kills
+  every worker mid-queue and records nothing, which cost 91 CPU-hours here once.
 - **Raise concurrency, move everything to Lustre.** Not just the output — see
   below. `-M` is per CPU, so it multiplies by `-w`: at `8G`, `-w 36` would
   reserve 288 GB of a 480 GB node for a run needing well under 2G per site.

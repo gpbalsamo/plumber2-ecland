@@ -25,12 +25,13 @@
 #
 # COST. Cost tracks TIMESTEPS, not years -- PLUMBER2 mixes half-hourly and hourly
 # forcing, so a 17-year site measured 3106 s against 1835 s for a 21-year one.
-# Fitted on 43 sites at NLOOP=2: 10.1 ms per timestep, 3.6% median error, times
-# 1.32 when 30 workers share a node (memory bandwidth, measured). The group is
-# 17.1 M timesteps over 170 sites, so a full run is about 64 CPU-hours and 30 GB
-# of raw output. Refit rather than reuse: the same law over FLUXNET Shuttle sites
-# gives 194 s per site-year against 86 here, so nothing transfers between the two
-# repositories. len(time) from each forcing file is the predictor.
+# Measured over a complete 170-site run at NLOOP=2 with -a 2 -w 30: 14.0 ms per
+# timestep, 6.8% median error, no useful intercept. The group is 17.1 M timesteps,
+# so a full run is 63 CPU-hours, 69 minutes of wall clock, and 131 GB of raw
+# output -- about 770 MB per site, which is why raw output belongs on $SCRATCH.
+# Refit rather than reuse: the same law over FLUXNET Shuttle sites gives 194 s per
+# site-year against 86 here, so nothing transfers between the two repositories.
+# len(time) from each forcing file is the predictor.
 #
 # HOW MANY WORKERS. Concurrency is ARRAY_TASKS x WORKERS_PER_TASK, and the two
 # are not interchangeable, because the scarce resource is job slots rather than
@@ -44,20 +45,23 @@
 # element claim by the same atomic mkdir as workers across nodes.
 #
 # 60 is the number worth remembering for this group. Concurrency stops paying at
-# the FLOOR of 1.23 h -- FI-Hyy 1996-2014, 333,120 half-hourly timesteps, the
-# costliest single site, which is serial and cannot be split. Note it is NOT the
-# longest record: US-Ha1 spans 21 years but hourly, so it is half the work.
-# 60 workers already reach that floor (64 CPU-h / 60 = 1.07 h < 1.23 h), and 90
-# gains nothing. Going to 180, as the Shuttle does with -a 5 -w 36, is right for
-# 775 sites and 3x oversized for 170. Below the floor, halving the work is the
-# only lever left: NLOOP=1 from an equilibrated restart.
+# the FLOOR of 1.16 h -- FI-Hyy 1996-2014, 333,120 half-hourly timesteps, measured
+# at 4178 s, the costliest single site and serial so it cannot be split. Note it
+# is NOT the longest record: US-Ha1 spans 21 years but hourly, so it is half the
+# work. 60 workers already reach that floor (63 CPU-h / 60 = 1.05 h < 1.16 h);
+# measured, an LPT schedule over the real per-site costs gives 1.16 h at both 60
+# and 120 workers, and the complete run finished in 69 minutes. Going to 180, as
+# the Shuttle does with -a 5 -w 36, is right for 775 sites and 3x oversized for
+# 170. Below the floor, halving the work is the only lever left: NLOOP=1 from an
+# equilibrated restart.
 #
 # WALL LIMIT. Size it on the per-worker DRAIN time, not on one site: a worker
 # takes site after site until the queue is empty, so it lives for roughly
-# total/N -- 2.13 h at 30 workers, 1.07 h at 60 -- but never below the costliest
-# single site, 1.23 h, since one worker must carry it to the end. The 02:00:00
-# default covers that floor with margin and also covers a 60-worker drain; raise
-# it if you cut concurrency further. A worker killed at the limit loses only its
+# total/N -- 2.5 h at 25 workers, 1.05 h at 60 -- but never below the costliest
+# single site, 1.16 h, since one worker must carry it to the end. The 02:30:00
+# default leaves about 60% margin over that floor: the measured run took 69 min
+# and a 02:00:00 limit came within 10 minutes of killing it. Raise it further if
+# you cut concurrency below 60. A worker killed at the limit loses only its
 # in-flight site (the claim is swept and the site retried next submission), but a
 # limit below the drain means every worker dies mid-queue and nothing is recorded:
 # that mistake cost 91 CPU-hours here for zero sites.
@@ -95,15 +99,15 @@ GROUP="PLUMBER2"
 ECLAND_MASTER="${ECLAND_MASTER:-${PERM:-/perm/${USER}}/ecland/build/bin/ecland-master-dp}"
 FORCING_TYPE="insitu"
 NLOOP=2
-# Concurrency is ARRAY_TASKS x WORKERS_PER_TASK = 60, which reaches the 0.50 h
-# floor for this group while consuming 2 of the 30 job slots the association
-# allows -- see "HOW MANY WORKERS" above. WALLTIME covers the resulting 0.5 h
-# drain with room to spare, and still covers the 1.0 h drain of a -w 1 run;
-# raise it if you drop concurrency below ~20 workers.
+# Concurrency is ARRAY_TASKS x WORKERS_PER_TASK = 60, which reaches this group's
+# measured 1.16 h floor while consuming 2 of the 30 job slots the association
+# allows -- see "HOW MANY WORKERS" above. WALLTIME clears that floor with margin;
+# raise it if you drop concurrency below 60 workers, where the drain rather than
+# the floor sets the finish.
 ARRAY_TASKS=2
 WORKERS_PER_TASK=30
 THROTTLE=""
-WALLTIME="02:00:00"
+WALLTIME="02:30:00"
 QOS="nf"
 # A single-point run needs very little: the sibling repo runs 26-year records at
 # 2G. This is per CPU, so it multiplies by -w -- at 8G, -w 36 would reserve
