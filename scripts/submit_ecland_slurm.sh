@@ -29,6 +29,9 @@
 # timestep, 6.8% median error, no useful intercept. The group is 17.1 M timesteps,
 # so a full run is 63 CPU-hours, 69 minutes of wall clock, and 131 GB of raw
 # output -- about 770 MB per site, which is why raw output belongs on $SCRATCH.
+# Size scratch from that apparent figure, not from du on $PERM: that filer
+# compresses and reports 29 GB allocated for 108 GB of real bytes, which is how
+# this was first underestimated by 4x.
 # Refit rather than reuse: the same law over FLUXNET Shuttle sites gives 194 s per
 # site-year against 86 here, so nothing transfers between the two repositories.
 # len(time) from each forcing file is the predictor.
