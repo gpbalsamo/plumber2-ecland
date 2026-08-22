@@ -113,82 +113,95 @@ scripts/ecland_run_experiment.sh \
 
 #### Faster on the HPC: one job array draining a shared site queue
 
-`scripts/submit_ecland_slurm.sh` runs the whole group as one SLURM job array
+`scripts/submit_ecland_slurm.sh` runs a whole site group as one SLURM job array
 whose elements are interchangeable workers draining a shared queue, rather than
-one job per site. Sites are claimed with an atomic `mkdir` and recorded
-individually, so the run is resumable and a failure costs one site, not a slice.
+one job per site. Each site is claimed and recorded individually, so a run is
+resumable and a failure costs one site rather than the rest of the queue.
 
-**Run it from the `$SCRATCH` mirror**, which is a requirement above ~25
-concurrent sites, not a preference — see [Working on `$SCRATCH`](#working-on-scratch):
+It works from `$PERM` directly:
+
+```bash
+scripts/submit_ecland_slurm.sh -x /perm/pad/ecland/build/bin/ecland-master-dp
+```
+
+For the full group, run from a `$SCRATCH` mirror instead. `$SCRATCH` is Lustre
+and `$PERM` is NFS, so past roughly 25 concurrent sites the filesystem, not the
+model, sets the pace. The steps below are the complete cycle: mirror, run,
+post-process, benchmark, copy results back.
+
+**1. Mirror inputs and code to `$SCRATCH`.**
 
 ```bash
 scripts/scratch_mirror.sh push
 cd ${SCRATCH}/plumber2-ecland
+```
+
+**2. Submit the run.**
+
+```bash
 scripts/submit_ecland_slurm.sh -i -x $PWD/ecland-build/bin/ecland-master-dp
 ```
 
-Defaults are `-a 2 -w 30 -l 2 -T 02:30:00 -q nf -M 2G`. Add `-d` for a dry run,
-`-h` for the full option list. Measured on a complete 170-site run at `NLOOP=2`:
+**3. Watch it.** The submit command prints these paths for the run it started.
+
+```bash
+squeue -u $USER -n ecland_PLUMBER2
+ls status | wc -l                    # sites finished, of 170
+cat status/* | sort | uniq -c        # OK / FAILED tally
+```
+
+To retry failures, delete their status files and submit again; completed sites
+are skipped automatically.
+
+```bash
+grep -lx FAILED status/* | xargs -r rm
+```
+
+**4. Post-process** raw output into the PLUMBER2 variable schema.
+
+```bash
+python3 scripts/postproc_plumber2.py --inputdir output --outdir postprocessed
+```
+
+**5. Benchmark** against the flux observations, writing a dashboard.
+
+```bash
+python3 scripts/benchmark_plumber2.py --out-dir benchmark/dashboards/<model-name>
+```
+
+**6. Copy the results back to `$PERM`.**
+
+```bash
+cd -
+scripts/scratch_mirror.sh pull
+```
+
+`pull` returns `postprocessed/` and `benchmark/{models,dashboards}` only; raw
+`output/` stays behind. **`$SCRATCH` is pruned automatically**, so anything not
+pulled back is eventually lost. `scratch_mirror.sh status` shows both sides.
+
+##### Options and expected cost
+
+`-d` prints the job script without submitting, `-h` lists every option. The
+defaults are `-a 2 -w 30 -l 2 -T 02:30:00 -q nf -M 2G`, giving 60 concurrent
+sites from 2 SLURM job slots. For the 170-site group at `NLOOP=2`:
 
 | | |
 |---|---|
-| Wall clock | **69 min** (0 failures) |
+| Wall clock | **69 min** at 60 concurrent sites |
 | CPU time | **63 CPU-hours** |
 | Raw output | **131 GB** (~770 MB per site) |
-| Cost law | **14.0 ms per forcing timestep** (6.8% median error) |
+| Cost | **14.0 ms per forcing timestep** |
 
-Cost tracks timesteps, not years — PLUMBER2 mixes half-hourly and hourly forcing.
-Don't reuse these timings for the FLUXNET Shuttle sites, which are ~2× costlier
-per site-year; refit from `len(time)` in the forcing files.
+Cost scales with timesteps rather than years, since PLUMBER2 mixes half-hourly
+and hourly forcing; estimate a group from `len(time)` in its forcing files.
 
-**Concurrency is `-a` × `-w`.** Job slots are the scarce resource, not CPUs:
-`MaxJobs=30` per account on QoS `nf`, counted per array element, so `-a` above 30
-only adds `PENDING` elements while `-w` buys concurrency from a node's 256 CPUs.
-`-a 2 -w 30` gives 60 concurrent sites for 2 job slots.
-
-**60 workers is the number worth remembering.** Anything at or above it finishes
-in the same 1.16 h, the cost of `FI-Hyy_1996-2014` (4178 s) running alone —
-serial and unsplittable. Larger shapes such as the sibling repo's `-a 5 -w 36`
-suit 775 sites, not 170. Below that floor the only lever is `NLOOP=1` from an
-equilibrated restart. If you *lower* concurrency, raise `-T` to match: a worker
-lives for the whole drain (≈ total/N), and a limit below it kills every worker
-mid-queue and records nothing.
-
-Output, work dirs, logs and queue state go under `<-O>/ecland_<GROUP>/`, which
-defaults to the repository. Pass `-i` to make the run root the tree itself, so
-`output/` sits where postproc and benchmark expect it — the intended mode on the
-mirror. The generated job script also exports `OMPI_MCA_hwloc_base_binding_policy=none`
-and `OMP_NUM_THREADS=1`; both are required, and the run is ~15× slower without
-them. The script header explains why.
-
-#### Working on `$SCRATCH`
-
-`$PERM` is a single NFS filer, `$SCRATCH` is Lustre: measured with 30 concurrent
-writers, 530 MB/s against 4863 MB/s. Reads count as much as writes, since all
-workers in one element share their node's NFS client — so forcing, clim and the
-executable all have to be on Lustre too. Bulk work happens there; only results
-come back:
-
-```bash
-scripts/scratch_mirror.sh push          # inputs + code + ecland-build -> $SCRATCH
-cd ${SCRATCH}/plumber2-ecland
-scripts/submit_ecland_slurm.sh -i -x $PWD/ecland-build/bin/ecland-master-dp
-python3 scripts/postproc_plumber2.py --inputdir output --outdir postprocessed
-python3 scripts/benchmark_plumber2.py --out-dir benchmark/dashboards/<model-name>
-cd -; scripts/scratch_mirror.sh pull    # postprocessed/ + benchmark/ -> $PERM
-```
-
-The mirror keeps this repository's layout, so scripts work there unchanged.
-`push` sends `scripts`, `namelists`, `forcing`, `clim`, `flux` and
-`ecland-build/{bin,lib,lib64}` — the executable resolves its libraries through an
-`$ORIGIN/../lib64` rpath, so `bin/` and `lib64/` must travel together. `pull`
-returns **only** `postprocessed/` and `benchmark/{models,dashboards}`; the 131 GB
-of raw `output/` is never copied back. Neither direction uses `--delete`.
-**`$SCRATCH` is pruned automatically**, so anything not pulled back is eventually
-gone. `scratch_mirror.sh status` shows both sides.
-
-Size scratch from apparent bytes, not `du` on `$PERM`: that filer compresses and
-reports 29 GB allocated for 108 GB of real output.
+Concurrency is `-a` × `-w`. Job slots are the scarce resource: `MaxJobs=30` per
+account on QoS `nf`, counted per array element, so raise `-w` rather than `-a`
+past 30. Sixty workers is enough here — beyond it the run still takes 1.16 h,
+the cost of the single most expensive site running alone. Reducing concurrency
+means raising `-T` to match, since a worker lives for the whole drain (≈ total/N)
+and a wall limit below it kills every worker mid-queue.
 
 The postprocessing of model output is done by `scripts/postproc_plumber2.py`, which maps raw ecLand output onto the common PLUMBER2 variable schema (`Qle`, `Qh`, `NEE`, `GPP`, soil moisture/temperature profiles, etc.), including the derived `SWup` and `Rnet` (= `SWnet` + `LWnet`) radiation terms:
 
