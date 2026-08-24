@@ -1188,6 +1188,10 @@
     const titleLines = wrapText(spec.title, Math.floor(layoutW / (tSize * 0.52)), narrow ? 3 : 2);
     const subLines   = spec.sub ? wrapText(spec.sub, Math.floor(layoutW / (sSize * 0.52)), narrow ? 3 : 2) : [];
     const legend     = spec.legend || [];
+    // A figure whose axis is a set of codes has to carry what the codes mean:
+    // the biome glossary sits in HTML beside the panel, so it is pulled into
+    // the file as a footnote rather than left behind on the page.
+    const noteLines  = spec.notes ? wrapText(spec.notes, Math.floor(layoutW / (fSize * 0.5)), 4) : [];
     const stamp = `ecLand × PLUMBER2 flux benchmark · ${SITES.length} sites · quality-checked (QC = measured) observations only · generated ${DATA.generated.slice(0,10)}`;
     const stampLines = wrapText(stamp, Math.floor(layoutW / (fSize * 0.5)), 3);
 
@@ -1199,9 +1203,10 @@
     const legPerRow = Math.max(1, Math.floor(layoutW / (fSize * 17)));
     const legRows   = legend.length ? Math.ceil(legend.length / legPerRow) : 0;
     const legH      = legRows ? legRows * fSize * 2.0 + pad * 0.3 : 0;
+    const noteH     = noteLines.length ? noteLines.length * fSize * 1.35 + pad * 0.5 : 0;
     const footH     = pad * 0.5 + stampLines.length * fSize * 1.35 + pad * 0.8;
     const W = layoutW + 2 * pad;
-    const H = head + bodyH + legH + footH;
+    const H = head + bodyH + legH + noteH + footH;
 
     // the sans stack quotes its multi-word faces ("Segoe UI"); those quotes would
     // close the style="..." attribute the stack is written into, so swap them for
@@ -1258,6 +1263,12 @@
         s += `<text x="${(x + 2.8*r).toFixed(1)}" y="${y.toFixed(1)}" style="${tStyle}font-size:${fSize.toFixed(2)}px;fill:${cMuted}">${escXml(it.label)}</text>`;
       });
     }
+
+    let ny = head + bodyH + legH + pad * 0.5 + fSize;
+    noteLines.forEach(l=>{
+      s += `<text x="${pad}" y="${ny.toFixed(1)}" style="${tStyle}font-size:${fSize.toFixed(2)}px;fill:${cMuted}">${escXml(l)}</text>`;
+      ny += fSize * 1.35;
+    });
 
     let fy = H - pad * 0.8 - (stampLines.length - 1) * fSize * 1.35;
     stampLines.forEach(l=>{
@@ -1368,9 +1379,11 @@
         title: `Taylor diagram — ${VAR_META[state.varName].full} (${state.varName})`,
         sub: 'angle = correlation with observations · radius = normalised variability σ_model / σ_obs',
         name: 'taylor'})},
-      {id:'biome-svg', spec:()=>({
+      {id:'biome-svg', notes: ()=> 'IGBP classes — ' + Array.from(document.querySelectorAll('#biome-glossary .gloss-item'))
+                                        // keep the class name, drop the full IGBP definition some entries carry
+                                        .map(g=> g.textContent.trim().split(':')[0]).join(' · '), spec:()=>({
         title: `Skill by land cover — ${VAR_META[state.varName].full} (${state.varName})`,
-        sub: 'NME distribution per IGBP biome (lower is better)',
+        sub: 'NME distribution per IGBP biome, box = interquartile range (lower is better)',
         name: 'biome-nme'})},
       {id:'strip-svg', spec:()=>({
         title: `All sites ranked — ${VAR_META[state.varName].full} (${state.varName})`,
@@ -1390,6 +1403,7 @@
           title: s.title,
           sub: s.sub,
           legend: d.legend ? legendItems(document.getElementById(d.legend)) : [],
+          notes: d.notes ? d.notes() : null,
           filename: `${runTag}_${s.name}_${state.varName}`
         };
       }));
