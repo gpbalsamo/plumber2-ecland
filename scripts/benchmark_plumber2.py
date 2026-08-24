@@ -231,6 +231,37 @@ def process_site(site: str, period: str, flux_path: Path, model_path: Path) -> d
     return record
 
 
+def write_dashboard(out_dir: Path, data_str: str) -> None:
+    """Render the dashboard for one result directory from its data JSON."""
+    if not DASHBOARD_TEMPLATE.exists():
+        print(f'Note: {DASHBOARD_TEMPLATE} not found, skipped building the dashboard HTML.')
+        return
+    dashboard_html = out_dir / 'index.html'
+    template = DASHBOARD_TEMPLATE.read_text(encoding='utf-8')
+    # data is embedded in a <script type="application/json"> tag; escape "</" so no
+    # embedded string (e.g. a stray site name) can prematurely close that tag.
+    out = template.replace('__DATA_JSON__', data_str.replace('</', '<\\/'))
+    dashboard_html.write_text(out, encoding='utf-8')
+    print(f'Wrote {dashboard_html} ({dashboard_html.stat().st_size / 1e6:.2f} MB)')
+
+
+def rebuild_html(root: Path) -> int:
+    """Re-render every dashboard at or below root from the JSON already there.
+
+    The metrics are the expensive part -- a full 170-site pass reads every model
+    and flux file again -- while the template is the part that changes when the
+    dashboard itself is edited. Keeping the two separable means a template fix
+    reaches published dashboards in a second and cannot silently alter a number.
+    """
+    dirs = sorted({j.parent for j in root.rglob('plumber2_benchmark_data.json')})
+    if not dirs:
+        print(f'No plumber2_benchmark_data.json found at or below {root}')
+        return 1
+    for d in dirs:
+        write_dashboard(d, (d / 'plumber2_benchmark_data.json').read_text(encoding='utf-8'))
+    return 0
+
+
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--flux-dir', type=Path, default=DEFAULT_FLUX_DIR)
@@ -242,6 +273,10 @@ def parse_args() -> argparse.Namespace:
     p.add_argument('--sites-file', type=Path, default=None,
                     help='Optional text file with one SITE_period per line (e.g. scripts/best_sites_to_benchmark.txt) '
                          'to restrict the benchmark to a curated subset.')
+    p.add_argument('--rebuild-html', type=Path, default=None,
+                    help='Re-render index.html from the plumber2_benchmark_data.json already on disk, for every '
+                         'dashboard directory at or below this path, and exit. Nothing is recomputed and no model '
+                         'or flux file is read: use it after editing dashboard_template.html.')
     return p.parse_args()
 
 
@@ -258,6 +293,8 @@ def read_sites_file(path: Path) -> set[tuple[str, str]]:
 
 def main() -> None:
     args = parse_args()
+    if args.rebuild_html is not None:
+        raise SystemExit(rebuild_html(args.rebuild_html))
     # Keep the full-170-site and curated-subset outputs in clearly separate,
     # consistently-named subdirectories rather than mixing the full run
     # directly into --out-dir with the subset nested inside it.
@@ -304,16 +341,7 @@ def main() -> None:
     size_mb = data_json.stat().st_size / 1e6
     print(f'Wrote {data_json} ({size_mb:.2f} MB)')
 
-    if DASHBOARD_TEMPLATE.exists():
-        dashboard_html = out_dir / 'index.html'
-        template = DASHBOARD_TEMPLATE.read_text(encoding='utf-8')
-        # data is embedded in a <script type="application/json"> tag; escape "</" so no
-        # embedded string (e.g. a stray site name) can prematurely close that tag.
-        out = template.replace('__DATA_JSON__', data_str.replace('</', '<\\/'))
-        dashboard_html.write_text(out, encoding='utf-8')
-        print(f'Wrote {dashboard_html} ({dashboard_html.stat().st_size / 1e6:.2f} MB)')
-    else:
-        print(f'Note: {DASHBOARD_TEMPLATE} not found, skipped building the dashboard HTML.')
+    write_dashboard(out_dir, data_str)
 
 
 if __name__ == '__main__':

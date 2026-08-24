@@ -273,6 +273,14 @@ python3 scripts/benchmark_plumber2.py \
   --sites-file scripts/best_sites_to_benchmark.txt
 ```
 
+**Exporting figures.** Every panel in the dashboard carries `PNG` / `SVG` / `PDF` buttons: `PNG` downloads a 2400 px raster (300 dpi at 20 cm wide), `SVG` a vector file for Inkscape/Illustrator, and `PDF` opens the print dialog for that one figure (choose *Save as PDF*). Each figure is drawn with its own title, the selected variable, the legend and a provenance line, and is always exported on a white background even when the dashboard is in dark mode. The four seasonal diurnal panels export together as a single 2x2 figure.
+
+After editing `scripts/dashboard_template.html`, re-render the checked-in dashboards without recomputing any metric:
+
+```bash
+python3 scripts/benchmark_plumber2.py --rebuild-html benchmark/dashboards
+```
+
 `--out-dir` is a base path: the script automatically routes output into `<out-dir>/all170/` or `<out-dir>/best42/` depending on whether `--sites-file` is given, so the same `--out-dir` works for both commands above. `--flux-dir` overrides the default `flux/PLUMBER2_original/`; `--site` filters to one or more specific sites. Each run writes a metrics CSV, a JSON payload, and `index.html` (named so uploading the output folder to a static host opens the dashboard automatically) — open it directly in a browser, no server required. `benchmark/dashboards/` is checked in with worked examples for the control run, the runoff-fix variant, and JULESGL9.
 
 ## Namelist
