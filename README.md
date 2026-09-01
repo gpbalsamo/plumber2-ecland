@@ -82,32 +82,42 @@ Add `--sites-file scripts/best_sites_to_benchmark.txt` to score only the 42 cura
 
 To speed up the run using the Lustre filesystem, the files necessary to the run are mirrored on `$SCRATCH` (4863 MB/s vs 530 MB/s on `$PERM`).
 
+Every script below is invoked by its full path, because each takes the tree it
+lives in as the tree it works on: the mirror is driven from `$PERM`, and the run
+itself from the copy inside `$SCRATCH`.
+
 **1. Mirror inputs and code to `$SCRATCH`.**
 
 ```bash
-scripts/scratch_mirror.sh push
-cd ${SCRATCH}/plumber2-ecland
+$PERM/plumber2-ecland/scripts/scratch_mirror.sh push
 ```
 
-*Expect:* the same layout as this repository — forcing, clim, flux, namelists, scripts — so every script below works there unflagged.
+*Expect:* `$SCRATCH/plumber2-ecland/` with the same layout as this repository — forcing, clim, flux, namelists, scripts and the ecLand build.
 
-**2. Submit.** `-i` puts `output/` inside the mirrored tree.
+**2. Submit** the mirrored copy of the script, so that forcing is read and output written on Lustre. `-i` puts `output/` inside the mirrored tree.
 
 ```bash
-scripts/submit_ecland_slurm.sh -i -x $PWD/ecland-build/bin/ecland-master-dp
+cd $SCRATCH/plumber2-ecland
+$SCRATCH/plumber2-ecland/scripts/submit_ecland_slurm.sh \
+  -i -x $SCRATCH/plumber2-ecland/ecland-build/bin/ecland-master-dp
 ```
 
 *Expect:* 170 runnable sites, 60 concurrent, and the monitoring commands printed for this run. Completed sites are skipped on resubmission, so retrying failures costs only the failures.
 
-**3. Post-process and benchmark**, exactly as in steps 4 and 5 of the quick start.
+**3. Post-process and benchmark** as in steps 4 and 5 of the quick start, from `$SCRATCH/plumber2-ecland` — the Python scripts work on the tree you run them from, so this keeps `output/` and `postprocessed/` on Lustre too.
 
-**4. Copy the results back to `$PERM`.**
+```bash
+cd $SCRATCH/plumber2-ecland
+python3 $SCRATCH/plumber2-ecland/scripts/postproc_plumber2.py --inputdir output --outdir postprocessed
+python3 $SCRATCH/plumber2-ecland/scripts/benchmark_plumber2.py \
+  --model-dir postprocessed --out-dir benchmark/dashboards/<model-name>
+```
+
+**4. Copy the results back to `$PERM`.** Back to the `$PERM` copy of the mirror script — the mirrored one would pull `$SCRATCH` onto itself.
 
 ```bash
 $PERM/plumber2-ecland/scripts/scratch_mirror.sh pull
 ```
-
-Use the `$PERM` copy of the script, as above: it takes the side it lives on as the destination, so the mirrored copy would pull `$SCRATCH` onto itself.
 
 *Expect:* `postprocessed/` and `benchmark/{models,dashboards}` return; raw `output/` stays behind. **`$SCRATCH` is pruned automatically**, so anything not pulled back is eventually lost. `$PERM/plumber2-ecland/scripts/scratch_mirror.sh status` shows both sides.
 
