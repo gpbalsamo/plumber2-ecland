@@ -81,8 +81,10 @@ Usage: $(basename "$0") {push|pull|status} [-n] [-M MIRROR]
   -M MIRROR   Mirror location (default: ${MIRROR})
   -h          Show this help
 
-Deletions are never propagated: rsync runs without --delete in both directions,
-so a stale file in the mirror is possible but losing a result is not.
+Nothing here can lose a result: rsync runs without --delete in both directions,
+so deletions are never propagated, and pull runs with --update, so a file that is
+newer on \$PERM is kept rather than replaced by an older one from the mirror.
+A stale file in the mirror is possible; losing a result is not.
 EOF
 }
 
@@ -106,6 +108,15 @@ done
 
 RSYNC=(rsync -a --human-readable --info=stats1 --exclude '.git' --exclude '__pycache__')
 "${DRY_RUN}" && RSYNC+=(--dry-run --itemize-changes)
+
+# Pull adds --update, so an older file in the mirror never replaces a newer one
+# here. The mirror is not authoritative for results: a dashboard rebuilt on $PERM
+# after the run is newer than the copy the run left on $SCRATCH, and plain -a
+# would overwrite it, since it replaces on any size or mtime difference and has
+# no notion of newer. That silently reverted two checked-in dashboards once.
+# Push deliberately does NOT get --update: $PERM is authoritative for code and
+# inputs, and a stale edit in the mirror must lose to it.
+PULL_RSYNC=("${RSYNC[@]}" --update)
 
 show_side() {
   local label=$1 root=$2 p
@@ -168,7 +179,7 @@ case "${ACTION}" in
       fi
       echo "  ${p}"
       mkdir -p "${PERM_ROOT}/${p}"
-      "${RSYNC[@]}" "${MIRROR}/${p}/" "${PERM_ROOT}/${p}/"
+      "${PULL_RSYNC[@]}" "${MIRROR}/${p}/" "${PERM_ROOT}/${p}/"
       n_found=$((n_found + 1))
     done
     if [[ "${n_found}" -eq 0 ]]; then
