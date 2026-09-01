@@ -80,7 +80,7 @@ Add `--sites-file scripts/best_sites_to_benchmark.txt` to score only the 42 cura
 
 ## Running the full 170 sites on the HPC
 
-`$SCRATCH` is Lustre and `$PERM` is NFS. Measured with 30 concurrent writers, `$PERM` sustains 530 MB/s against 4863 MB/s on `$SCRATCH`, so past roughly 25 concurrent sites the filesystem, not the model, sets the pace. Run the full group from a `$SCRATCH` mirror and bring only the results back.
+To speed up the run using the Lustre filesystem, the files necessary to the run are mirrored on `$SCRATCH` (4863 MB/s vs 530 MB/s on `$PERM`).
 
 **1. Mirror inputs and code to `$SCRATCH`.**
 
