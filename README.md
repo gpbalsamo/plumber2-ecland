@@ -42,15 +42,11 @@ ls clim/PLUMBER2 | wc -l       # 340
 
 ### 3. Run ecLand
 
-One site group, as a SLURM job array of interchangeable workers draining a shared queue:
+The main path is **[Running the full 170 sites on the HPC](#running-the-full-170-sites-on-the-hpc)**: mirror the inputs to `$SCRATCH`, submit one SLURM job array of interchangeable workers draining a shared site queue, post-process and benchmark there, then copy the results back. Follow that section through and return here for what the outputs mean.
 
-```bash
-scripts/submit_ecland_slurm.sh -x <path_to_ecland_executable>
-```
+*Expect:* the submit command prints a summary of what will run (sites runnable, queue length, concurrency, output path), a job id, and the monitoring, retry and post-processing commands **for that run**. Each finished site becomes a directory `output/<site>_<years>/` holding the raw `o_*.nc` fields plus the namelist it ran with.
 
-*Expect:* a summary of what will run (sites runnable, queue length, concurrency, output path), a job id, and the exact monitoring, retry and post-processing commands **for that run** — use the ones it prints rather than any written here. Each finished site becomes a directory `output/<site>_<years>/` holding the raw `o_*.nc` fields plus the namelist it ran with.
-
-For the full 170 sites, run from a `$SCRATCH` mirror instead — see [Running the full 170 sites](#running-the-full-170-sites-on-the-hpc). To run without SLURM at all, see [One site at a time](#one-site-at-a-time).
+For a handful of sites the mirror is not worth it — `scripts/submit_ecland_slurm.sh -x <exe> -S <site-list>` runs from `$PERM` directly. To skip SLURM entirely, see [One site at a time](#one-site-at-a-time) or [Running locally on macOS](#running-locally-on-macos).
 
 ### 4. Post-process
 
@@ -104,7 +100,7 @@ $SCRATCH/plumber2-ecland/scripts/submit_ecland_slurm.sh \
 
 *Expect:* 170 runnable sites, 60 concurrent, and the monitoring commands printed for this run. Completed sites are skipped on resubmission, so retrying failures costs only the failures.
 
-**3. Post-process and benchmark** as in steps 4 and 5 of the quick start, from `$SCRATCH/plumber2-ecland` — the Python scripts work on the tree you run them from, so this keeps `output/` and `postprocessed/` on Lustre too.
+**3. Post-process and benchmark** from `$SCRATCH/plumber2-ecland` — the Python scripts work on the tree you run them from, so this keeps `output/` and `postprocessed/` on Lustre too. Steps 4 and 5 of the quick start describe what these two commands produce.
 
 ```bash
 cd $SCRATCH/plumber2-ecland
