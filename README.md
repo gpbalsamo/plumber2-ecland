@@ -104,11 +104,12 @@ scripts/submit_ecland_slurm.sh -i -x $PWD/ecland-build/bin/ecland-master-dp
 **4. Copy the results back to `$PERM`.**
 
 ```bash
-cd -
-scripts/scratch_mirror.sh pull
+$PERM/plumber2-ecland/scripts/scratch_mirror.sh pull
 ```
 
-*Expect:* `postprocessed/` and `benchmark/{models,dashboards}` return; raw `output/` stays behind. **`$SCRATCH` is pruned automatically**, so anything not pulled back is eventually lost. `scripts/scratch_mirror.sh status` shows both sides.
+Use the `$PERM` copy of the script, as above: it takes the side it lives on as the destination, so the mirrored copy would pull `$SCRATCH` onto itself.
+
+*Expect:* `postprocessed/` and `benchmark/{models,dashboards}` return; raw `output/` stays behind. **`$SCRATCH` is pruned automatically**, so anything not pulled back is eventually lost. `$PERM/plumber2-ecland/scripts/scratch_mirror.sh status` shows both sides.
 
 ### What a full run costs
 
