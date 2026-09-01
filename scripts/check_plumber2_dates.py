@@ -2,27 +2,26 @@
 """
 Compare forcing and post-processed time ranges for every PLUMBER2 site.
 
-Expected layout
----------------
+Expected layout, relative to the repository (or $SCRATCH mirror) the script is
+run from -- same convention as postproc_plumber2.py and benchmark_plumber2.py:
+
 Forcing files:
-    /perm/pad/plumber2-ecland/forcing/PLUMBER2/
-        met_insituHT_<SITE>.nc
+    forcing/PLUMBER2/met_insituHT_<SITE>.nc
 
 Post-processed files:
-    /perm/pad/plumber2-ecland/postprocessed/
-        ecLand_PLUMBER2_<SITE>.nc
+    postprocessed/ecLand_PLUMBER2_<SITE>.nc
 
 The script prints one row per site and writes a CSV summary.
 
 Examples
 --------
-    python3 check_plumber2_dates.py
+    python3 scripts/check_plumber2_dates.py
 
-    python3 check_plumber2_dates.py \
-        --forcing-dir /perm/pad/plumber2-ecland/forcing/PLUMBER2 \
-        --postproc-dir /perm/pad/plumber2-ecland/postprocessed
+    python3 scripts/check_plumber2_dates.py \
+        --forcing-dir forcing/PLUMBER2 \
+        --postproc-dir postprocessed
 
-    python3 check_plumber2_dates.py --show-all-times
+    python3 scripts/check_plumber2_dates.py --show-all-times
 """
 
 from __future__ import annotations
@@ -37,9 +36,9 @@ import numpy as np
 import xarray as xr
 
 
-DEFAULT_FORCING_DIR = Path("/perm/pad/plumber2-ecland/forcing/PLUMBER2")
-DEFAULT_POSTPROC_DIR = Path("/perm/pad/plumber2-ecland/postprocessed")
-DEFAULT_CSV = Path("/perm/pad/plumber2-ecland/postprocessed/date_validation.csv")
+DEFAULT_FORCING_DIR = Path("forcing/PLUMBER2")
+DEFAULT_POSTPROC_DIR = Path("postprocessed")
+DEFAULT_CSV = Path("postprocessed/date_validation.csv")
 
 
 @dataclass

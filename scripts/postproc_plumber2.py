@@ -13,8 +13,10 @@ import numpy as np
 import xarray as xr
 from netCDF4 import Dataset as NetCDFDataset
 
-DEFAULT_INPUT_DIR = Path('/perm/pad/plumber2-ecland/output')
-DEFAULT_OUTPUT_DIR = Path('/perm/pad/plumber2-ecland/postprocessed')
+# Relative to the working directory, i.e. the repository (or $SCRATCH mirror)
+# the script is run from -- same convention as benchmark_plumber2.py.
+DEFAULT_INPUT_DIR = Path('output')
+DEFAULT_OUTPUT_DIR = Path('postprocessed')
 FILL = np.float32(-9999.0)
 SOIL_LEVELS = np.array([1, 2, 3, 4], dtype=np.int32)
 SOIL_LAYER_BOTTOMS = np.array([0.07, 0.28, 1.00, 2.89], dtype=np.float32)
@@ -78,8 +80,10 @@ EXPECTED_FILES = sorted({m[0] for m in MAPPINGS})
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description='Post-process ecLand PLUMBER2 site output.')
-    p.add_argument('--inputdir', type=Path, default=DEFAULT_INPUT_DIR)
-    p.add_argument('--outdir', type=Path, default=DEFAULT_OUTPUT_DIR)
+    p.add_argument('--inputdir', type=Path, default=DEFAULT_INPUT_DIR,
+                   help=f'Raw ecLand output, one <site>_<years>/ per site (default: {DEFAULT_INPUT_DIR}).')
+    p.add_argument('--outdir', type=Path, default=DEFAULT_OUTPUT_DIR,
+                   help=f'Where the PLUMBER2-schema files are written (default: {DEFAULT_OUTPUT_DIR}).')
     p.add_argument('--site', action='append', default=None, help='Optional site filter; repeatable.')
     p.add_argument('--overwrite', action='store_true')
     p.add_argument('--strict', action='store_true')

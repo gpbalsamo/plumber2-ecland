@@ -209,7 +209,7 @@ plumber2-ecland/
         └── best42/             # The 42 curated benchmark sites
 ```
 
-Key scripts, all of which resolve the repository root from their own location and so run from any directory:
+Key scripts. The shell scripts resolve the repository root from their own location, so they run from any directory; the Python ones default to paths relative to the working directory, so run them from the repository root (or from the `$SCRATCH` mirror, which has the same layout).
 
 | Script | Does |
 |---|---|
