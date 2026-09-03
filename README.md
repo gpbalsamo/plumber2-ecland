@@ -42,7 +42,7 @@ ls clim/PLUMBER2 | wc -l       # 340
 
 ### 3. Run ecLand
 
-The main path is **[Running the full 170 sites on the HPC](#running-the-full-170-sites-on-the-hpc)**: mirror the inputs to `$SCRATCH`, submit one SLURM job array of interchangeable workers draining a shared site queue, post-process and benchmark there, then copy the results back. Follow that section through and return here for what the outputs mean.
+The main path is **[Running the full 170 sites on the HPC](#running-the-full-170-sites-on-the-hpc)**: mirror the inputs to `$SCRATCH`, submit one SLURM job array of interchangeable workers draining a shared site queue, benchmark there, then copy the results back. Post-processing auto-chains after the array job via a SLURM dependency, so it needs no separate step. Follow that section through and return here for what the outputs mean.
 
 *Expect:* the submit command prints a summary of what will run (sites runnable, queue length, concurrency, output path), a job id, and the monitoring, retry and post-processing commands **for that run**. Each finished site becomes a directory `output/<site>_<years>/` holding the raw `o_*.nc` fields plus the namelist it ran with.
 
@@ -55,6 +55,15 @@ Map the raw ecLand output onto the common PLUMBER2 variable schema (`Qle`, `Qh`,
 ```bash
 python3 scripts/postproc_plumber2.py --inputdir output --outdir postprocessed
 ```
+
+For many sites at once, `scripts/postproc_run_experiment.sh` fans this out over parallel workers instead of the one-site-at-a-time loop above — either as local background processes, or as one SLURM job per site under `LBATCH=true`:
+
+```bash
+scripts/postproc_run_experiment.sh -i output -o postprocessed -j 25
+LBATCH=true scripts/postproc_run_experiment.sh -i output -o postprocessed -j 25
+```
+
+On the full 170-site HPC path below, `submit_ecland_slurm.sh` already runs this for you, chained after the array job — you only need it by hand for a manual or partial re-run.
 
 *Expect:* one file per site in `postprocessed/`, named `ecLand_PLUMBER2_<site>_<years>.nc`. Verify the time axes:
 
@@ -90,7 +99,7 @@ $PERM/plumber2-ecland/scripts/scratch_mirror.sh push
 
 *Expect:* `$SCRATCH/plumber2-ecland/` with the same layout as this repository — forcing, clim, flux, namelists, scripts and the ecLand build.
 
-**2. Submit** the mirrored copy of the script, so that forcing is read and output written on Lustre. `-i` puts `output/` inside the mirrored tree.
+**2. Submit** the mirrored copy of the script, so that forcing is read and output written on Lustre. `-i` puts `output/` inside the mirrored tree. Post-processing auto-chains after the array job finishes, via `--dependency=afterany` — there is no separate post-process step to run by hand.
 
 ```bash
 cd $SCRATCH/plumber2-ecland
@@ -98,13 +107,12 @@ $SCRATCH/plumber2-ecland/scripts/submit_ecland_slurm.sh \
   -i -x $SCRATCH/plumber2-ecland/ecland-build/bin/ecland-master-dp
 ```
 
-*Expect:* 170 runnable sites, 60 concurrent, and the monitoring commands printed for this run. Completed sites are skipped on resubmission, so retrying failures costs only the failures.
+*Expect:* 170 runnable sites, 60 concurrent, and the monitoring commands printed for this run. Completed sites are skipped on resubmission, so retrying failures costs only the failures. Also printed: the id of the chained post-processing job — it starts on its own once every array element reaches a terminal state (success, failure or wall-limit kill alike), processes only the sites `ecland_run_queue.sh` marked `OK`, and writes to `postprocessed/`. Disable the chain with `-P` and run `scripts/postproc_run_experiment.sh` by hand instead; tune its concurrency with `-j` (default 25).
 
-**3. Post-process and benchmark** from `$SCRATCH/plumber2-ecland` — the Python scripts work on the tree you run them from, so this keeps `output/` and `postprocessed/` on Lustre too. Steps 4 and 5 of the quick start describe what these two commands produce.
+**3. Benchmark** from `$SCRATCH/plumber2-ecland` once the chained post-processing job has finished (`squeue -u $USER -n postproc_PLUMBER2`) — the Python scripts work on the tree you run them from, so this keeps `postprocessed/` on Lustre too. Step 5 of the quick start describes what this produces.
 
 ```bash
 cd $SCRATCH/plumber2-ecland
-python3 $SCRATCH/plumber2-ecland/scripts/postproc_plumber2.py --inputdir output --outdir postprocessed
 python3 $SCRATCH/plumber2-ecland/scripts/benchmark_plumber2.py \
   --model-dir postprocessed --out-dir benchmark/dashboards/<model-name>
 ```

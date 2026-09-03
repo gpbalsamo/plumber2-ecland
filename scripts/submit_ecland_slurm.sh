@@ -122,6 +122,17 @@ SITE_LIST_FILE=""
 DRY_RUN=false
 IN_PLACE=false
 
+# Post-processing, chained after the array job via --dependency=afterany so
+# it starts on its own once every element reaches a terminal state -- success,
+# failure or wall-limit kill alike, since a partial run still has OK sites
+# worth writing out. One job is enough: postproc_plumber2.py is I/O-bound and
+# takes seconds per site, nothing like the model run, so PARALLEL concurrent
+# workers on a single node clear all 170 sites in minutes.
+AUTO_POSTPROC=true
+POSTPROC_PARALLEL=25
+POSTPROC_WALLTIME="00:30:00"
+POSTPROC_MEM_PER_CPU="4G"
+
 # A completed site holds the full set of model files. PLUMBER2 runs write 13
 # o_*.nc diagnostics plus restartout.nc; requiring the restart as well as the
 # count keeps a half-written directory from being seeded as done.
@@ -158,12 +169,15 @@ Usage: $(basename "$0") [options]
                      benchmark_plumber2.py expect. Intended for the \$SCRATCH
                      mirror (see scripts/scratch_mirror.sh); on \$PERM it would
                      seed from this repository's existing output/
+  -j POSTPROC_PARALLEL  Sites post-processed at once in the chained postproc
+                     job (default: ${POSTPROC_PARALLEL})
+  -P                Do not auto-chain post-processing after the array job
   -d                Dry run: write the job script and print it, do not submit
   -h                Show this help
 EOF
 }
 
-while getopts ":hdig:x:t:l:a:w:p:S:n:T:q:M:O:" opt; do
+while getopts ":hdiPg:x:t:l:a:w:p:S:n:T:q:M:O:j:" opt; do
   case "${opt}" in
     g) GROUP="${OPTARG}" ;;
     x) ECLAND_MASTER="${OPTARG}" ;;
@@ -178,6 +192,8 @@ while getopts ":hdig:x:t:l:a:w:p:S:n:T:q:M:O:" opt; do
     q) QOS="${OPTARG}" ;;
     M) MEM_PER_CPU="${OPTARG}" ;;
     O) OUT_ROOT="${OPTARG}" ;;
+    j) POSTPROC_PARALLEL="${OPTARG}" ;;
+    P) AUTO_POSTPROC=false ;;
     d) DRY_RUN=true ;;
     i) IN_PLACE=true ;;
     h) usage; exit 0 ;;
@@ -405,13 +421,72 @@ echo
 if [[ "${DRY_RUN}" == true ]]; then
   echo "=== dry run, not submitting ==="
   cat "${JOB_SCRIPT}"
+  if [[ "${AUTO_POSTPROC}" == true ]]; then
+    echo
+    echo "Postproc will auto-chain via --dependency=afterany once this job is submitted (disable with -P)."
+  fi
   exit 0
 fi
 
-sbatch "${JOB_SCRIPT}"
+job_output=$(sbatch "${JOB_SCRIPT}")
+echo "${job_output}"
+array_job_id=$(awk '{print $NF}' <<<"${job_output}")
+
 echo
 echo "Monitor : squeue -u \$USER -n ecland_${GROUP}"
 echo "Progress: ls ${RUN_ROOT}/status | wc -l   (of ${n_sites})"
 echo "Tally   : cat ${RUN_ROOT}/status/* | sort | uniq -c"
 echo "Retry   : grep -lx FAILED ${RUN_ROOT}/status/* | xargs rm   then submit again"
-echo "Postproc: python3 ${SCRIPT_DIR}/postproc_plumber2.py --inputdir ${RUN_ROOT}/output --outdir ${PROJECT_ROOT}/postprocessed"
+
+manual_postproc_cmd="${SCRIPT_DIR}/postproc_run_experiment.sh -i ${RUN_ROOT}/output -o ${PROJECT_ROOT}/postprocessed -j ${POSTPROC_PARALLEL}"
+
+if [[ "${AUTO_POSTPROC}" != true ]]; then
+  echo "Postproc: ${manual_postproc_cmd}"
+elif [[ -z "${array_job_id}" ]]; then
+  echo "WARNING: could not parse the array job id from sbatch's output; skipping the postproc chain." >&2
+  echo "Postproc: ${manual_postproc_cmd}"
+else
+  POSTPROC_JOB_SCRIPT="${SLURM_DIR}/postproc_${GROUP}.sbatch"
+  cat > "${POSTPROC_JOB_SCRIPT}" <<EOF
+#!/bin/bash
+#SBATCH --job-name=postproc_${GROUP}
+#SBATCH --dependency=afterany:${array_job_id}
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=${POSTPROC_PARALLEL}
+#SBATCH --mem-per-cpu=${POSTPROC_MEM_PER_CPU}
+#SBATCH --time=${POSTPROC_WALLTIME}
+#SBATCH --qos=${QOS}
+#SBATCH --output=${SLURM_DIR}/postproc-%j.out
+
+set -eu
+source /etc/profile.d/modules.sh 2>/dev/null || true
+module load python3/3.10.10-01
+
+# Only the sites ecland_run_queue.sh actually marked OK -- a directory can
+# exist under output/ for a site that is still queued, still running, or
+# FAILED, and postproc_plumber2.py would otherwise fill those variables with
+# -9999 rather than error, silently corrupting the schema.
+OK_SITES="${SLURM_DIR}/postproc_ok_sites.txt"
+grep -lx OK "${STATUS_DIR}"/* 2>/dev/null | xargs -n1 basename > "\${OK_SITES}" || true
+
+if [[ ! -s "\${OK_SITES}" ]]; then
+  echo "No OK sites in ${STATUS_DIR}; nothing to post-process." >&2
+  exit 0
+fi
+
+"${SCRIPT_DIR}/postproc_run_experiment.sh" \\
+  -i "${RUN_ROOT}/output" \\
+  -o "${PROJECT_ROOT}/postprocessed" \\
+  -S "\${OK_SITES}" \\
+  -j ${POSTPROC_PARALLEL}
+EOF
+  chmod +x "${POSTPROC_JOB_SCRIPT}"
+
+  postproc_job_output=$(sbatch "${POSTPROC_JOB_SCRIPT}") || { echo "WARNING: failed to submit the chained postproc job" >&2; postproc_job_output=""; }
+  postproc_job_id=$(awk '{print $NF}' <<<"${postproc_job_output}")
+
+  echo "Postproc: auto-chained as job ${postproc_job_id:-<submit failed>}, runs once ${array_job_id} reaches a terminal state (dependency=afterany)"
+  echo "          only OK sites are processed; output -> ${PROJECT_ROOT}/postprocessed ; log -> ${SLURM_DIR}/postproc-<jobid>.out"
+  echo "          disable with -P; run manually any time with:"
+  echo "            ${manual_postproc_cmd}"
+fi
