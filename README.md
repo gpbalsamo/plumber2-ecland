@@ -63,7 +63,7 @@ scripts/postproc_run_experiment.sh -i output -o postprocessed -j 25
 LBATCH=true scripts/postproc_run_experiment.sh -i output -o postprocessed -j 25
 ```
 
-On the full 170-site HPC path below, `submit_ecland_slurm.sh` already runs this for you, chained after the array job — you only need it by hand for a manual or partial re-run.
+For the full 170-site or 42-site runs on HPC the script `submit_ecland_slurm.sh` already runs this for you, chained after the array job — you only need it by hand for a manual or partial re-run.
 
 *Expect:* one file per site in `postprocessed/`, named `ecLand_PLUMBER2_<site>_<years>.nc`. Verify the time axes:
 
