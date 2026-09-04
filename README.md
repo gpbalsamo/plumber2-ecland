@@ -42,7 +42,7 @@ ls clim/PLUMBER2 | wc -l       # 340
 
 ### 3. Run ecLand
 
-The main path is **[Running the full 170 sites on the HPC](#running-the-full-170-sites-on-the-hpc)**: mirror the inputs to `$SCRATCH`, submit one SLURM job array of interchangeable workers draining a shared site queue, benchmark there, then copy the results back. Post-processing auto-chains after the array job via a SLURM dependency, so it needs no separate step. Follow that section through and return here for what the outputs mean.
+The main path is **[Running the full 170-site or a 42-site subset on the HPC](#running-the-full-170-site-or-a-42-site-subset-on-the-hpc)**: mirror the inputs to `$SCRATCH`, submit one SLURM job array of interchangeable workers draining a shared site queue, benchmark there, then copy the results back. Post-processing auto-chains after the array job via a SLURM dependency, so it needs no separate step. Follow that section through and return here for what the outputs mean.
 
 *Expect:* the submit command prints a summary of what will run (sites runnable, queue length, concurrency, output path), a job id, and the monitoring, retry and post-processing commands **for that run**. Each finished site becomes a directory `output/<site>_<years>/` holding the raw `o_*.nc` fields plus the namelist it ran with.
 
@@ -83,7 +83,7 @@ python3 scripts/benchmark_plumber2.py \
 
 Add `--sites-file scripts/best_sites_to_benchmark.txt` to score only the 42 curated benchmark sites; that writes to `best42/` alongside `all170/`, so the same `--out-dir` serves both.
 
-## Running the full 170 sites or a 42-site subset on the HPC
+## Running the full 170-site or a 42-site subset on the HPC
 
 To speed up the run using the Lustre filesystem, the files necessary to the run are mirrored on `$SCRATCH` (4863 MB/s vs 530 MB/s on `$PERM`).
 
