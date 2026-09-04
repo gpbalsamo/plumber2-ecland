@@ -83,7 +83,7 @@ python3 scripts/benchmark_plumber2.py \
 
 Add `--sites-file scripts/best_sites_to_benchmark.txt` to score only the 42 curated benchmark sites; that writes to `best42/` alongside `all170/`, so the same `--out-dir` serves both.
 
-## Running the full 170 sites on the HPC
+## Running the full 170 sites or a 42-site subset on the HPC
 
 To speed up the run using the Lustre filesystem, the files necessary to the run are mirrored on `$SCRATCH` (4863 MB/s vs 530 MB/s on `$PERM`).
 
@@ -109,6 +109,8 @@ $SCRATCH/plumber2-ecland/scripts/submit_ecland_slurm.sh \
 
 *Expect:* 170 runnable sites, 60 concurrent, and the monitoring commands printed for this run. Completed sites are skipped on resubmission, so retrying failures costs only the failures. Also printed: the id of the chained post-processing job — it starts on its own once every array element reaches a terminal state (success, failure or wall-limit kill alike), processes only the sites `ecland_run_queue.sh` marked `OK`, and writes to `postprocessed/`. Disable the chain with `-P` and run `scripts/postproc_run_experiment.sh` by hand instead; tune its concurrency with `-j` (default 25).
 
+For just the 42 curated sites instead of all 170, add `-S scripts/best_sites_to_benchmark.txt` — the same queue, concurrency and postproc chain apply, just over fewer sites.
+
 **3. Benchmark** from `$SCRATCH/plumber2-ecland` once the chained post-processing job has finished (`squeue -u $USER -n postproc_PLUMBER2`) — the Python scripts work on the tree you run them from, so this keeps `postprocessed/` on Lustre too. Step 5 of the quick start describes what this produces.
 
 ```bash
@@ -116,6 +118,8 @@ cd $SCRATCH/plumber2-ecland
 python3 $SCRATCH/plumber2-ecland/scripts/benchmark_plumber2.py \
   --model-dir postprocessed --out-dir benchmark/dashboards/<model-name>
 ```
+
+If step 2 was run with `-S scripts/best_sites_to_benchmark.txt`, add `--sites-file scripts/best_sites_to_benchmark.txt` here too — the output folder name (`all170/` vs `best42/`) comes from whether `--sites-file` was passed, not from how many sites are actually in `postprocessed/`, so it needs to be told explicitly.
 
 **4. Copy the results back to `$PERM`.** Back to the `$PERM` copy of the mirror script — the mirrored one would pull `$SCRATCH` onto itself.
 
