@@ -212,6 +212,20 @@ python3 scripts/benchmark_plumber2.py --rebuild-html benchmark/dashboards
 
 Other options: `--flux-dir` overrides the observation directory, `--site` filters to one or more sites (repeatable), `--out-dir` is a base path that the script routes into `all170/` or `best42/` itself.
 
+## Comparing two runs
+
+Once two experiments each have a `plumber2_benchmark_data.json` (step 5 above), pair them into one dashboard rather than eyeballing two separate ones:
+
+```bash
+python3 scripts/compare_plumber2.py \
+  --control benchmark/dashboards/ecland_cy50r1/best42/plumber2_benchmark_data.json \
+  --new benchmark/dashboards/<model-name>/best42/plumber2_benchmark_data.json \
+  --control-label "ecLand CY50R1 (control)" --new-label "<model-name>" \
+  --out benchmark/dashboards/<model-name>_vs_control/index.html
+```
+
+*Expect:* a self-contained `index.html` with per-variable paired scatter plots (control vs. new NME, one point per site — below the diagonal is improved), an aggregate metrics table and a sortable/searchable per-site table. It reuses each input's own climatology/diurnal aggregates rather than recomputing them, so it only needs the two JSON files, not the underlying flux or model output.
+
 ## Namelists
 
 - `namelists/namelist_ecland_50R1_ctl` — the ecLand 50R1 control, used by `ecland_run_experiment.sh` when `-n` is omitted.
@@ -253,6 +267,7 @@ Key scripts. The shell scripts resolve the repository root from their own locati
 | `check_plumber2_dates.py` | Check the post-processed time axes |
 | `check_water_budget.py` | Check raw-output water-balance closure per site |
 | `benchmark_plumber2.py` | Score against observations, build the dashboard |
+| `compare_plumber2.py` | Pair two runs' dashboards into one comparison view |
 | `plot_sites_map.py` | Render `plumber2_sites_map.png` |
 
 Site lists: `scripts/all_sites_plumber2.txt` (all 170) and `scripts/best_sites_to_benchmark.txt` (the 42 recommended by Gab Abramowitz for automated benchmarking, chosen for spatial and biome diversity).

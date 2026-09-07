@@ -1,0 +1,365 @@
+<title>ecLand Water Scheme Comparison</title>
+<meta charset="utf-8">
+<style>
+  :root{
+    color-scheme: light;
+    --page:      #f5f7f4;
+    --surface-1: #fcfcfb;
+    --surface-2: #f0f1ee;
+    --text-primary:   #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted:     #898781;
+    --grid:      #e1e0d9;
+    --axis:      #c3c2b7;
+    --border:    rgba(11,11,11,0.10);
+    --var-Qle: #2a78d6;
+    --var-Qh:  #eb6834;
+    --var-NEE: #1baf7a;
+    --model-ctrl: #8a8a86;
+    --model-new:  #5b5fc7;
+    --status-good:     #0ca30c;
+    --status-critical: #d03b3b;
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:where(:not([data-theme="light"])){
+      color-scheme: dark;
+      --page:      #101210; --surface-1: #1a1a19; --surface-2: #201f1d;
+      --text-primary:#ffffff; --text-secondary:#c3c2b7; --text-muted:#898781;
+      --grid:#2c2c2a; --axis:#383835; --border: rgba(255,255,255,0.10);
+      --var-Qle:#3987e5; --var-Qh:#d95926; --var-NEE:#199e70;
+      --model-ctrl:#93938d; --model-new:#8b8ee0;
+      --status-good:#33c733; --status-critical:#e2685f;
+    }
+  }
+  :root[data-theme="dark"]{
+    color-scheme: dark;
+    --page:      #101210; --surface-1: #1a1a19; --surface-2: #201f1d;
+    --text-primary:#ffffff; --text-secondary:#c3c2b7; --text-muted:#898781;
+    --grid:#2c2c2a; --axis:#383835; --border: rgba(255,255,255,0.10);
+    --var-Qle:#3987e5; --var-Qh:#d95926; --var-NEE:#199e70;
+    --model-ctrl:#93938d; --model-new:#8b8ee0;
+    --status-good:#33c733; --status-critical:#e2685f;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--page); color:var(--text-primary); font-family:var(--font-sans);
+    -webkit-font-smoothing:antialiased; line-height:1.4; font-size:14px;
+  }
+  a{color:inherit;}
+  .app{max-width:1220px; margin:0 auto; padding:20px 20px 48px;}
+  h1,h2,h3{text-wrap:balance; margin:0;}
+  .eyebrow{font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--text-muted); font-weight:650;}
+
+  header.topbar{
+    display:flex; align-items:center; justify-content:space-between; gap:16px;
+    padding:16px 0 20px; border-bottom:1px solid var(--border); margin-bottom:20px; flex-wrap:wrap;
+  }
+  .brand h1{font-size:21px; font-weight:700; margin-top:2px;}
+  .legend-chips{display:flex; gap:10px; flex-wrap:wrap;}
+  .chip{
+    display:flex; align-items:center; gap:7px; font-size:12px; font-weight:600;
+    padding:6px 12px; border-radius:99px; background:var(--surface-2); border:1px solid var(--border);
+  }
+  .chip .dot{width:9px; height:9px; border-radius:50%; flex:none;}
+  .theme-toggle{
+    border:1px solid var(--border); background:var(--surface-1); border-radius:8px;
+    width:32px; height:32px; display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--text-secondary);
+  }
+  .theme-toggle:focus-visible, button:focus-visible, input:focus-visible, th[data-key]:focus-visible{outline:2px solid var(--model-new); outline-offset:2px;}
+  .icon-moon{display:none;} :root[data-theme="dark"] .icon-sun{display:none;} :root[data-theme="dark"] .icon-moon{display:block;}
+  @media (prefers-color-scheme: dark){ :root:where(:not([data-theme="light"])) .icon-sun{display:none;} :root:where(:not([data-theme="light"])) .icon-moon{display:block;} }
+
+  .stat-row{display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:16px;}
+  .stat-tile{
+    background:var(--surface-1); border:1px solid var(--border); border-radius:12px; padding:16px 18px;
+  }
+  .stat-tile .vname{font-size:13px; font-weight:700;}
+  .stat-tile .vsub{font-size:11px; color:var(--text-muted);}
+  .stat-tile .row{display:flex; align-items:baseline; gap:10px; margin-top:10px; font-family:var(--font-mono);}
+  .stat-tile .arrow-line{display:flex; align-items:center; gap:8px; margin-top:4px;}
+  .stat-tile .val-ctrl{color:var(--text-muted); font-size:15px;}
+  .stat-tile .val-new{font-size:20px; font-weight:700;}
+  .stat-tile .delta{font-size:12px; font-weight:700; padding:2px 8px; border-radius:99px;}
+  .delta.good{color:var(--status-good); background:color-mix(in srgb, var(--status-good) 14%, transparent);}
+  .delta.bad{color:var(--status-critical); background:color-mix(in srgb, var(--status-critical) 14%, transparent);}
+  .stat-tile .counts{font-size:11px; color:var(--text-muted); margin-top:8px;}
+
+  .panel{background:var(--surface-1); border:1px solid var(--border); border-radius:12px; padding:16px 18px; margin-bottom:16px;}
+  .panel-head{display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:10px; flex-wrap:wrap;}
+  .panel-head h2{font-size:15px; font-weight:700;}
+  .panel-sub{font-size:12px; color:var(--text-muted); margin:2px 0 0;}
+
+  .wtd-panel{display:grid; grid-template-columns:1.1fr 1fr; gap:20px;}
+  .wtd-panel .callout{font-size:13px; color:var(--text-secondary); line-height:1.6;}
+  .wtd-panel .callout b{color:var(--text-primary); font-family:var(--font-mono);}
+  .wtd-score{display:flex; align-items:center; gap:16px; background:var(--surface-2); border-radius:10px; padding:14px 16px;}
+  .wtd-score .big{font-size:34px; font-weight:800; font-family:var(--font-mono); color:var(--status-good);}
+  .wtd-score .lbl{font-size:12px; color:var(--text-muted); max-width:210px;}
+  @media (max-width:760px){.wtd-panel{grid-template-columns:1fr;}}
+
+  .scatter-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:14px;}
+  .scatter-cell svg{width:100%; height:auto; display:block;}
+  .scatter-cell .title{font-size:12px; font-weight:700; margin-bottom:4px;}
+  @media (max-width:860px){.scatter-grid, .stat-row{grid-template-columns:1fr;}}
+
+  .table-wrap{overflow-x:auto;}
+  table{width:100%; border-collapse:collapse; font-size:12.5px;}
+  th,td{padding:7px 10px; text-align:left; white-space:nowrap; border-bottom:1px solid var(--border);}
+  th{position:sticky; top:0; background:var(--surface-1); font-size:11px; text-transform:uppercase; letter-spacing:.03em; color:var(--text-muted); cursor:pointer; user-select:none;}
+  th.num, td.num{text-align:right; font-variant-numeric:tabular-nums; font-family:var(--font-mono);}
+  tbody tr:hover{background:var(--surface-2);}
+  .pill{display:inline-block; padding:1px 8px; border-radius:99px; font-weight:700; font-size:11.5px;}
+  .strip-controls input{
+    font:inherit; padding:6px 10px; border-radius:8px; border:1px solid var(--border); background:var(--surface-2); color:var(--text-primary); width:220px;
+  }
+  .var-tabs{display:flex; gap:6px;}
+  .var-tabs button{
+    font:inherit; font-size:12px; font-weight:650; padding:6px 12px; border-radius:8px; border:1px solid var(--border);
+    background:var(--surface-2); color:var(--text-secondary); cursor:pointer;
+  }
+  .var-tabs button[aria-selected="true"]{background:var(--model-new); color:#fff; border-color:var(--model-new);}
+
+  footer.note{font-size:11px; color:var(--text-muted); line-height:1.7; border-top:1px solid var(--border); padding-top:14px; margin-top:6px;}
+  footer.note code{font-family:var(--font-mono); background:var(--surface-2); padding:1px 5px; border-radius:4px;}
+</style>
+
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <span class="eyebrow">ecLand PLUMBER2 benchmark</span>
+      <h1>Water Scheme Comparison</h1>
+    </div>
+    <div class="legend-chips">
+      <span class="chip"><span class="dot" style="background:var(--model-ctrl)"></span><span id="ctrl-chip-label"></span></span>
+      <span class="chip"><span class="dot" style="background:var(--model-new)"></span><span id="new-chip-label"></span></span>
+    </div>
+    <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Toggle light/dark theme" title="Toggle light/dark theme">
+      <svg class="icon-sun" viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><circle cx="10" cy="10" r="4" fill="currentColor"/><g stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><line x1="10" y1="1" x2="10" y2="3.2"/><line x1="10" y1="16.8" x2="10" y2="19"/><line x1="1" y1="10" x2="3.2" y2="10"/><line x1="16.8" y1="10" x2="19" y2="10"/><line x1="3.8" y1="3.8" x2="5.3" y2="5.3"/><line x1="14.7" y1="14.7" x2="16.2" y2="16.2"/><line x1="3.8" y1="16.2" x2="5.3" y2="14.7"/><line x1="14.7" y1="5.3" x2="16.2" y2="3.8"/></g></svg>
+      <svg class="icon-moon" viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M15.5 12.3A6.8 6.8 0 0 1 7.7 4.5a.6.6 0 0 0-.8-.7 8 8 0 1 0 9.3 9.3.6.6 0 0 0-.7-.8Z"/></svg>
+    </button>
+  </header>
+
+  <section class="stat-row" id="stat-tiles"></section>
+
+  <section class="panel wtd-panel">
+    <div>
+      <div class="panel-head"><h2>Water table</h2></div>
+      <p class="callout">
+        The control has no active water-table scheme (<code>LEGWRECHARGE=.FALSE.</code>) — the water table is not a prognostic
+        variable, so there is nothing to pair it against site by site. This version adds a genuine, restart-checkpointed
+        prognostic water-table depth, recharged from diagnosed drainage and throttled by <code>RWTDRECHARGE=0.1</code>,
+        with three water-balance bugs found and fixed along the way (double-counted recharge, an unclamped Fan et al.
+        initial condition, and a multi-layer snow diagnostic reading only its top layer). Network-wide water-balance
+        closure across all 42 sites is now within <b>4.4 mm/yr</b> of exact everywhere, down from residuals as large as
+        several thousand mm/yr before the fixes.
+      </p>
+    </div>
+    <div class="wtd-score">
+      <div class="big">26/29</div>
+      <div class="lbl">sites hold water-table depth within 20% of Fan et al. (2017) or deeper, scored on sites with a Fan depth ≥10 m (up from a 16/29 ceiling before this branch's fixes)</div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <div><h2>Skill by site, paired</h2><p class="panel-sub">each point is one site — NME (lower is better), control on the x-axis, this version on the y-axis. Below the diagonal = improved.</p></div>
+    </div>
+    <div class="scatter-grid" id="scatter-grid"></div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <div><h2>Aggregate metrics</h2><p class="panel-sub">mean across 42 sites</p></div>
+    </div>
+    <div class="table-wrap">
+      <table id="agg-table"></table>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <div><h2>All sites</h2><p class="panel-sub">sorted by NME change, most improved first</p></div>
+      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+        <div class="var-tabs" id="var-tabs" role="tablist"></div>
+        <div class="strip-controls"><input id="site-search" type="search" placeholder="Search site, country, biome…" autocomplete="off"/></div>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table id="site-table">
+        <thead><tr>
+          <th data-key="site">Site</th><th data-key="site_name">Name</th><th data-key="country">Country</th><th data-key="igbp">Biome</th>
+          <th data-key="nme_ctrl" class="num">NME ctrl</th><th data-key="nme_new" class="num">NME new</th><th data-key="delta" class="num">Δ NME</th>
+          <th data-key="r_ctrl" class="num">R ctrl</th><th data-key="r_new" class="num">R new</th>
+        </tr></thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer class="note">
+    Observations: PLUMBER2 v1.0 (FLUXNET2015-derived), quality-controlled half-hours only. NME is the normalised mean
+    absolute error — 0 is perfect, 1 means the model does no better than predicting the observed mean. Control generated
+    <span id="ctrl-gen"></span>; this version generated <span id="new-gen"></span>, from <span id="n-sites"></span> paired sites.
+  </footer>
+</div>
+
+<script>
+const DATA = __PAYLOAD_JSON__;
+const VARS = ['Qle','Qh','NEE'];
+const VAR_LABEL = {Qle:'Latent heat', Qh:'Sensible heat', NEE:'CO₂ exchange'};
+const VAR_COLOR = {Qle:'var(--var-Qle)', Qh:'var(--var-Qh)', NEE:'var(--var-NEE)'};
+const fmt = (x,d=3)=> (x===null||x===undefined||Number.isNaN(x)) ? '–' : x.toFixed(d);
+
+document.getElementById('ctrl-chip-label').textContent = DATA.ctrl_label;
+document.getElementById('new-chip-label').textContent = DATA.new_label;
+document.getElementById('ctrl-gen').textContent = (DATA.ctrl_generated||'').slice(0,10);
+document.getElementById('new-gen').textContent = (DATA.new_generated||'').slice(0,10);
+document.getElementById('n-sites').textContent = DATA.n_sites;
+
+// ---- stat tiles ----
+const tilesEl = document.getElementById('stat-tiles');
+VARS.forEach(v=>{
+  const a = DATA.agg[v];
+  const improved = a.nme_new < a.nme_ctrl;
+  const deltaPct = 100*(a.nme_new-a.nme_ctrl)/a.nme_ctrl;
+  const tile = document.createElement('div');
+  tile.className='stat-tile';
+  tile.innerHTML = `
+    <div class="vname" style="color:${VAR_COLOR[v]}">${v}</div>
+    <div class="vsub">${VAR_LABEL[v]}</div>
+    <div class="arrow-line">
+      <span class="val-ctrl">${fmt(a.nme_ctrl,3)}</span>
+      <span style="color:var(--text-muted)">→</span>
+      <span class="val-new">${fmt(a.nme_new,3)}</span>
+      <span class="delta ${improved?'good':'bad'}">${deltaPct>=0?'+':''}${deltaPct.toFixed(1)}%</span>
+    </div>
+    <div class="counts">NME · ${a.n_improved} improved · ${a.n_worsened} worsened of ${a.n_sites}</div>`;
+  tilesEl.appendChild(tile);
+});
+
+// ---- aggregate table ----
+const aggTable = document.getElementById('agg-table');
+let aggHtml = `<thead><tr><th>Variable</th><th class="num">Metric</th><th class="num">Control</th><th class="num">This version</th><th class="num">Δ</th></tr></thead><tbody>`;
+VARS.forEach(v=>{
+  const a = DATA.agg[v];
+  const rowsDef = [
+    ['NME (↓ better)', a.nme_ctrl, a.nme_new, 3],
+    ['RMSE', a.rmse_ctrl, a.rmse_new, 2],
+    ['Bias', a.bias_ctrl, a.bias_new, 2],
+    ['R (↑ better)', a.r_ctrl, a.r_new, 3],
+  ];
+  rowsDef.forEach((r,i)=>{
+    const [label, c, n, d] = r;
+    const lowerBetter = label.includes('↓');
+    const higherBetter = label.includes('↑');
+    let cls = '';
+    if(lowerBetter) cls = n<c ? 'good' : (n>c?'bad':'');
+    if(higherBetter) cls = n>c ? 'good' : (n<c?'bad':'');
+    const delta = n-c;
+    aggHtml += `<tr>${i===0?`<td rowspan="4" style="color:${VAR_COLOR[v]}; font-weight:700; vertical-align:top;">${v}</td>`:''}
+      <td>${label}</td><td class="num">${fmt(c,d)}</td><td class="num">${fmt(n,d)}</td>
+      <td class="num"><span class="pill ${cls?('delta '+cls):''}" style="${cls?'':'background:transparent;'}">${delta>=0?'+':''}${fmt(delta,d)}</span></td></tr>`;
+  });
+});
+aggHtml += '</tbody>';
+aggTable.innerHTML = aggHtml;
+
+// ---- scatter plots ----
+const scatterGrid = document.getElementById('scatter-grid');
+const W=340, H=300, M={l:38,r:14,t:10,b:32};
+function scatterSVG(v){
+  const pts = DATA.sites.filter(s=>s.metrics[v]).map(s=>({x:s.metrics[v].nme_ctrl, y:s.metrics[v].nme_new, site:s.site}));
+  const maxV = Math.max(1, ...pts.map(p=>Math.max(p.x,p.y))) * 1.05;
+  const sx = x => M.l + (x/maxV)*(W-M.l-M.r);
+  const sy = y => H-M.b - (y/maxV)*(H-M.t-M.b);
+  let ticks = [];
+  for(let t=0;t<=maxV;t+= maxV>3?1:0.5) ticks.push(Math.round(t*10)/10);
+  let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${v} NME comparison scatter">`;
+  ticks.forEach(t=>{
+    svg += `<line x1="${sx(t)}" y1="${M.t}" x2="${sx(t)}" y2="${H-M.b}" stroke="var(--grid)" stroke-width="1"/>`;
+    svg += `<line x1="${M.l}" y1="${sy(t)}" x2="${W-M.r}" y2="${sy(t)}" stroke="var(--grid)" stroke-width="1"/>`;
+    svg += `<text x="${sx(t)}" y="${H-M.b+14}" font-size="9" fill="var(--text-muted)" text-anchor="middle">${t}</text>`;
+    svg += `<text x="${M.l-6}" y="${sy(t)+3}" font-size="9" fill="var(--text-muted)" text-anchor="end">${t}</text>`;
+  });
+  svg += `<line x1="${sx(0)}" y1="${sy(0)}" x2="${sx(maxV)}" y2="${sy(maxV)}" stroke="var(--axis)" stroke-width="1" stroke-dasharray="3,3"/>`;
+  svg += `<line x1="${M.l}" y1="${H-M.b}" x2="${W-M.r}" y2="${H-M.b}" stroke="var(--axis)" stroke-width="1"/>`;
+  svg += `<line x1="${M.l}" y1="${M.t}" x2="${M.l}" y2="${H-M.b}" stroke="var(--axis)" stroke-width="1"/>`;
+  pts.forEach(p=>{
+    const col = p.y<p.x ? 'var(--status-good)' : (p.y>p.x?'var(--status-critical)':'var(--text-muted)');
+    svg += `<circle cx="${sx(p.x)}" cy="${sy(p.y)}" r="3.4" fill="${col}" fill-opacity="0.8"><title>${p.site}: ${p.x.toFixed(3)} → ${p.y.toFixed(3)}</title></circle>`;
+  });
+  svg += `<text x="${(W)/2}" y="${H-4}" font-size="10" fill="var(--text-secondary)" text-anchor="middle">Control NME</text>`;
+  svg += `<text x="12" y="${H/2}" font-size="10" fill="var(--text-secondary)" text-anchor="middle" transform="rotate(-90 12 ${H/2})">This version NME</text>`;
+  svg += `</svg>`;
+  return svg;
+}
+VARS.forEach(v=>{
+  const cell = document.createElement('div');
+  cell.className='scatter-cell';
+  cell.innerHTML = `<div class="title" style="color:${VAR_COLOR[v]}">${v}</div>` + scatterSVG(v);
+  scatterGrid.appendChild(cell);
+});
+
+// ---- var tabs + site table ----
+const varTabs = document.getElementById('var-tabs');
+let currentVar = 'Qle';
+VARS.forEach(v=>{
+  const b = document.createElement('button');
+  b.textContent = v; b.setAttribute('role','tab'); b.setAttribute('aria-selected', v===currentVar?'true':'false');
+  b.onclick = ()=>{ currentVar=v; [...varTabs.children].forEach(c=>c.setAttribute('aria-selected', c===b?'true':'false')); renderTable(); };
+  varTabs.appendChild(b);
+});
+
+let sortKey='delta', sortDir=1, searchTerm='';
+function getRows(){
+  return DATA.sites.filter(s=>s.metrics[currentVar]).map(s=>{
+    const m = s.metrics[currentVar];
+    return {site:s.site, site_name:s.site_name, country:s.country, igbp:s.igbp,
+      nme_ctrl:m.nme_ctrl, nme_new:m.nme_new, delta:m.nme_new-m.nme_ctrl, r_ctrl:m.r_ctrl, r_new:m.r_new};
+  });
+}
+function renderTable(){
+  let rows = getRows();
+  if(searchTerm){
+    const q = searchTerm.toLowerCase();
+    rows = rows.filter(r=> [r.site,r.site_name,r.country,r.igbp].some(x=>String(x).toLowerCase().includes(q)));
+  }
+  rows.sort((a,b)=> sortDir*( (a[sortKey]>b[sortKey]) - (a[sortKey]<b[sortKey]) ));
+  const tbody = document.getElementById('table-body');
+  tbody.innerHTML = rows.map(r=>{
+    const cls = r.delta<0?'good':(r.delta>0?'bad':'');
+    return `<tr><td>${r.site}</td><td>${r.site_name}</td><td>${r.country}</td><td>${r.igbp}</td>
+      <td class="num">${fmt(r.nme_ctrl)}</td><td class="num">${fmt(r.nme_new)}</td>
+      <td class="num"><span class="pill ${cls?('delta '+cls):''}">${r.delta>=0?'+':''}${fmt(r.delta)}</span></td>
+      <td class="num">${fmt(r.r_ctrl)}</td><td class="num">${fmt(r.r_new)}</td></tr>`;
+  }).join('');
+}
+document.querySelectorAll('#site-table th[data-key]').forEach(th=>{
+  th.tabIndex = 0;
+  const activate = ()=>{ const k=th.dataset.key; if(sortKey===k) sortDir*=-1; else {sortKey=k; sortDir=1;} renderTable(); };
+  th.addEventListener('click', activate);
+  th.addEventListener('keydown', e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); activate(); }});
+});
+document.getElementById('site-search').addEventListener('input', e=>{ searchTerm=e.target.value; renderTable(); });
+renderTable();
+
+// ---- theme toggle ----
+(function(){
+  const btn = document.getElementById('theme-toggle');
+  const root = document.documentElement;
+  try{
+    const saved = localStorage.getItem('plumber2-compare-theme');
+    if(saved==='light'||saved==='dark') root.setAttribute('data-theme', saved);
+  }catch(e){}
+  btn.addEventListener('click', ()=>{
+    const isDark = root.getAttribute('data-theme')==='dark' ||
+      (root.getAttribute('data-theme')!=='light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    const next = isDark ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try{ localStorage.setItem('plumber2-compare-theme', next); }catch(e){}
+  });
+})();
+</script>

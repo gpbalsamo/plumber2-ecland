@@ -1,0 +1,365 @@
+<title>ecLand Water Scheme Comparison</title>
+<meta charset="utf-8">
+<style>
+  :root{
+    color-scheme: light;
+    --page:      #f5f7f4;
+    --surface-1: #fcfcfb;
+    --surface-2: #f0f1ee;
+    --text-primary:   #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted:     #898781;
+    --grid:      #e1e0d9;
+    --axis:      #c3c2b7;
+    --border:    rgba(11,11,11,0.10);
+    --var-Qle: #2a78d6;
+    --var-Qh:  #eb6834;
+    --var-NEE: #1baf7a;
+    --model-ctrl: #8a8a86;
+    --model-new:  #5b5fc7;
+    --status-good:     #0ca30c;
+    --status-critical: #d03b3b;
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:where(:not([data-theme="light"])){
+      color-scheme: dark;
+      --page:      #101210; --surface-1: #1a1a19; --surface-2: #201f1d;
+      --text-primary:#ffffff; --text-secondary:#c3c2b7; --text-muted:#898781;
+      --grid:#2c2c2a; --axis:#383835; --border: rgba(255,255,255,0.10);
+      --var-Qle:#3987e5; --var-Qh:#d95926; --var-NEE:#199e70;
+      --model-ctrl:#93938d; --model-new:#8b8ee0;
+      --status-good:#33c733; --status-critical:#e2685f;
+    }
+  }
+  :root[data-theme="dark"]{
+    color-scheme: dark;
+    --page:      #101210; --surface-1: #1a1a19; --surface-2: #201f1d;
+    --text-primary:#ffffff; --text-secondary:#c3c2b7; --text-muted:#898781;
+    --grid:#2c2c2a; --axis:#383835; --border: rgba(255,255,255,0.10);
+    --var-Qle:#3987e5; --var-Qh:#d95926; --var-NEE:#199e70;
+    --model-ctrl:#93938d; --model-new:#8b8ee0;
+    --status-good:#33c733; --status-critical:#e2685f;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--page); color:var(--text-primary); font-family:var(--font-sans);
+    -webkit-font-smoothing:antialiased; line-height:1.4; font-size:14px;
+  }
+  a{color:inherit;}
+  .app{max-width:1220px; margin:0 auto; padding:20px 20px 48px;}
+  h1,h2,h3{text-wrap:balance; margin:0;}
+  .eyebrow{font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--text-muted); font-weight:650;}
+
+  header.topbar{
+    display:flex; align-items:center; justify-content:space-between; gap:16px;
+    padding:16px 0 20px; border-bottom:1px solid var(--border); margin-bottom:20px; flex-wrap:wrap;
+  }
+  .brand h1{font-size:21px; font-weight:700; margin-top:2px;}
+  .legend-chips{display:flex; gap:10px; flex-wrap:wrap;}
+  .chip{
+    display:flex; align-items:center; gap:7px; font-size:12px; font-weight:600;
+    padding:6px 12px; border-radius:99px; background:var(--surface-2); border:1px solid var(--border);
+  }
+  .chip .dot{width:9px; height:9px; border-radius:50%; flex:none;}
+  .theme-toggle{
+    border:1px solid var(--border); background:var(--surface-1); border-radius:8px;
+    width:32px; height:32px; display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--text-secondary);
+  }
+  .theme-toggle:focus-visible, button:focus-visible, input:focus-visible, th[data-key]:focus-visible{outline:2px solid var(--model-new); outline-offset:2px;}
+  .icon-moon{display:none;} :root[data-theme="dark"] .icon-sun{display:none;} :root[data-theme="dark"] .icon-moon{display:block;}
+  @media (prefers-color-scheme: dark){ :root:where(:not([data-theme="light"])) .icon-sun{display:none;} :root:where(:not([data-theme="light"])) .icon-moon{display:block;} }
+
+  .stat-row{display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:16px;}
+  .stat-tile{
+    background:var(--surface-1); border:1px solid var(--border); border-radius:12px; padding:16px 18px;
+  }
+  .stat-tile .vname{font-size:13px; font-weight:700;}
+  .stat-tile .vsub{font-size:11px; color:var(--text-muted);}
+  .stat-tile .row{display:flex; align-items:baseline; gap:10px; margin-top:10px; font-family:var(--font-mono);}
+  .stat-tile .arrow-line{display:flex; align-items:center; gap:8px; margin-top:4px;}
+  .stat-tile .val-ctrl{color:var(--text-muted); font-size:15px;}
+  .stat-tile .val-new{font-size:20px; font-weight:700;}
+  .stat-tile .delta{font-size:12px; font-weight:700; padding:2px 8px; border-radius:99px;}
+  .delta.good{color:var(--status-good); background:color-mix(in srgb, var(--status-good) 14%, transparent);}
+  .delta.bad{color:var(--status-critical); background:color-mix(in srgb, var(--status-critical) 14%, transparent);}
+  .stat-tile .counts{font-size:11px; color:var(--text-muted); margin-top:8px;}
+
+  .panel{background:var(--surface-1); border:1px solid var(--border); border-radius:12px; padding:16px 18px; margin-bottom:16px;}
+  .panel-head{display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:10px; flex-wrap:wrap;}
+  .panel-head h2{font-size:15px; font-weight:700;}
+  .panel-sub{font-size:12px; color:var(--text-muted); margin:2px 0 0;}
+
+  .wtd-panel{display:grid; grid-template-columns:1.1fr 1fr; gap:20px;}
+  .wtd-panel .callout{font-size:13px; color:var(--text-secondary); line-height:1.6;}
+  .wtd-panel .callout b{color:var(--text-primary); font-family:var(--font-mono);}
+  .wtd-score{display:flex; align-items:center; gap:16px; background:var(--surface-2); border-radius:10px; padding:14px 16px;}
+  .wtd-score .big{font-size:34px; font-weight:800; font-family:var(--font-mono); color:var(--status-good);}
+  .wtd-score .lbl{font-size:12px; color:var(--text-muted); max-width:210px;}
+  @media (max-width:760px){.wtd-panel{grid-template-columns:1fr;}}
+
+  .scatter-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:14px;}
+  .scatter-cell svg{width:100%; height:auto; display:block;}
+  .scatter-cell .title{font-size:12px; font-weight:700; margin-bottom:4px;}
+  @media (max-width:860px){.scatter-grid, .stat-row{grid-template-columns:1fr;}}
+
+  .table-wrap{overflow-x:auto;}
+  table{width:100%; border-collapse:collapse; font-size:12.5px;}
+  th,td{padding:7px 10px; text-align:left; white-space:nowrap; border-bottom:1px solid var(--border);}
+  th{position:sticky; top:0; background:var(--surface-1); font-size:11px; text-transform:uppercase; letter-spacing:.03em; color:var(--text-muted); cursor:pointer; user-select:none;}
+  th.num, td.num{text-align:right; font-variant-numeric:tabular-nums; font-family:var(--font-mono);}
+  tbody tr:hover{background:var(--surface-2);}
+  .pill{display:inline-block; padding:1px 8px; border-radius:99px; font-weight:700; font-size:11.5px;}
+  .strip-controls input{
+    font:inherit; padding:6px 10px; border-radius:8px; border:1px solid var(--border); background:var(--surface-2); color:var(--text-primary); width:220px;
+  }
+  .var-tabs{display:flex; gap:6px;}
+  .var-tabs button{
+    font:inherit; font-size:12px; font-weight:650; padding:6px 12px; border-radius:8px; border:1px solid var(--border);
+    background:var(--surface-2); color:var(--text-secondary); cursor:pointer;
+  }
+  .var-tabs button[aria-selected="true"]{background:var(--model-new); color:#fff; border-color:var(--model-new);}
+
+  footer.note{font-size:11px; color:var(--text-muted); line-height:1.7; border-top:1px solid var(--border); padding-top:14px; margin-top:6px;}
+  footer.note code{font-family:var(--font-mono); background:var(--surface-2); padding:1px 5px; border-radius:4px;}
+</style>
+
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <span class="eyebrow">ecLand PLUMBER2 benchmark</span>
+      <h1>Water Scheme Comparison</h1>
+    </div>
+    <div class="legend-chips">
+      <span class="chip"><span class="dot" style="background:var(--model-ctrl)"></span><span id="ctrl-chip-label"></span></span>
+      <span class="chip"><span class="dot" style="background:var(--model-new)"></span><span id="new-chip-label"></span></span>
+    </div>
+    <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Toggle light/dark theme" title="Toggle light/dark theme">
+      <svg class="icon-sun" viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><circle cx="10" cy="10" r="4" fill="currentColor"/><g stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><line x1="10" y1="1" x2="10" y2="3.2"/><line x1="10" y1="16.8" x2="10" y2="19"/><line x1="1" y1="10" x2="3.2" y2="10"/><line x1="16.8" y1="10" x2="19" y2="10"/><line x1="3.8" y1="3.8" x2="5.3" y2="5.3"/><line x1="14.7" y1="14.7" x2="16.2" y2="16.2"/><line x1="3.8" y1="16.2" x2="5.3" y2="14.7"/><line x1="14.7" y1="5.3" x2="16.2" y2="3.8"/></g></svg>
+      <svg class="icon-moon" viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M15.5 12.3A6.8 6.8 0 0 1 7.7 4.5a.6.6 0 0 0-.8-.7 8 8 0 1 0 9.3 9.3.6.6 0 0 0-.7-.8Z"/></svg>
+    </button>
+  </header>
+
+  <section class="stat-row" id="stat-tiles"></section>
+
+  <section class="panel wtd-panel">
+    <div>
+      <div class="panel-head"><h2>Water table</h2></div>
+      <p class="callout">
+        The control has no active water-table scheme (<code>LEGWRECHARGE=.FALSE.</code>) — the water table is not a prognostic
+        variable, so there is nothing to pair it against site by site. This version adds a genuine, restart-checkpointed
+        prognostic water-table depth, recharged from diagnosed drainage and throttled by <code>RWTDRECHARGE=0.1</code>,
+        with three water-balance bugs found and fixed along the way (double-counted recharge, an unclamped Fan et al.
+        initial condition, and a multi-layer snow diagnostic reading only its top layer). Network-wide water-balance
+        closure across all 42 sites is now within <b>4.4 mm/yr</b> of exact everywhere, down from residuals as large as
+        several thousand mm/yr before the fixes.
+      </p>
+    </div>
+    <div class="wtd-score">
+      <div class="big">26/29</div>
+      <div class="lbl">sites hold water-table depth within 20% of Fan et al. (2017) or deeper, scored on sites with a Fan depth ≥10 m (up from a 16/29 ceiling before this branch's fixes)</div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <div><h2>Skill by site, paired</h2><p class="panel-sub">each point is one site — NME (lower is better), control on the x-axis, this version on the y-axis. Below the diagonal = improved.</p></div>
+    </div>
+    <div class="scatter-grid" id="scatter-grid"></div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <div><h2>Aggregate metrics</h2><p class="panel-sub">mean across 42 sites</p></div>
+    </div>
+    <div class="table-wrap">
+      <table id="agg-table"></table>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <div><h2>All sites</h2><p class="panel-sub">sorted by NME change, most improved first</p></div>
+      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+        <div class="var-tabs" id="var-tabs" role="tablist"></div>
+        <div class="strip-controls"><input id="site-search" type="search" placeholder="Search site, country, biome…" autocomplete="off"/></div>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table id="site-table">
+        <thead><tr>
+          <th data-key="site">Site</th><th data-key="site_name">Name</th><th data-key="country">Country</th><th data-key="igbp">Biome</th>
+          <th data-key="nme_ctrl" class="num">NME ctrl</th><th data-key="nme_new" class="num">NME new</th><th data-key="delta" class="num">Δ NME</th>
+          <th data-key="r_ctrl" class="num">R ctrl</th><th data-key="r_new" class="num">R new</th>
+        </tr></thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer class="note">
+    Observations: PLUMBER2 v1.0 (FLUXNET2015-derived), quality-controlled half-hours only. NME is the normalised mean
+    absolute error — 0 is perfect, 1 means the model does no better than predicting the observed mean. Control generated
+    <span id="ctrl-gen"></span>; this version generated <span id="new-gen"></span>, from <span id="n-sites"></span> paired sites.
+  </footer>
+</div>
+
+<script>
+const DATA = {"ctrl_label": "ecLand CY50R1 (control)", "new_label": "This branch (RWTDRECHARGE=0.1, fixed)", "ctrl_generated": "2026-08-17T08:11:53Z", "new_generated": "2026-09-07T18:42:27Z", "n_sites": 42, "agg": {"Qle": {"n_sites": 42, "nme_ctrl": 0.5990404761904763, "nme_new": 0.5749690476190478, "rmse_ctrl": 54.485904761904784, "rmse_new": 52.017752380952395, "bias_ctrl": 0.6020428571428577, "bias_new": -2.3510333333333335, "r_ctrl": 0.789802380952381, "r_new": 0.7903071428571428, "n_improved": 21, "n_worsened": 21}, "Qh": {"n_sites": 42, "nme_ctrl": 0.5907499999999998, "nme_new": 0.6054285714285714, "rmse_ctrl": 61.18554285714287, "rmse_new": 60.93290952380955, "bias_ctrl": 10.41622857142857, "bias_new": 11.355740476190475, "r_ctrl": 0.8576690476190475, "r_new": 0.8568428571428571, "n_improved": 23, "n_worsened": 19}, "NEE": {"n_sites": 41, "nme_ctrl": 3.123858536585366, "nme_new": 1.9641268292682927, "rmse_ctrl": 16.62759024390244, "rmse_new": 11.921958536585365, "bias_ctrl": -3.9553902439024387, "bias_new": -1.553865853658537, "r_ctrl": 0.5892463414634146, "r_new": 0.6096390243902438, "n_improved": 32, "n_worsened": 9}}, "sites": [{"site": "AU-ASM", "site_name": "AliceSpringsMulga", "country": "Australia", "igbp": "ENF", "igbp_long": "Evergreen Needleleaf Forests", "lat": -22.283, "lon": 133.249, "period": "2011-2017", "years": 7.0, "metrics": {"Qle": {"nme_ctrl": 0.7698, "nme_new": 0.437, "rmse_ctrl": 55.2833, "rmse_new": 25.4417, "bias_ctrl": 7.1702, "bias_new": 0.9207, "r_ctrl": 0.7834, "r_new": 0.8683, "n": 90424, "pct_measured": 73.7}, "Qh": {"nme_ctrl": 0.2571, "nme_new": 0.1877, "rmse_ctrl": 53.8898, "rmse_new": 33.0461, "bias_ctrl": 12.5109, "bias_new": 9.5617, "r_ctrl": 0.949, "r_new": 0.9762, "n": 90424, "pct_measured": 73.7}, "NEE": {"nme_ctrl": 8.8592, "nme_new": 2.3811, "rmse_ctrl": 11.1234, "rmse_new": 3.1919, "bias_ctrl": 9.8537, "bias_new": 2.6492, "r_ctrl": 0.0412, "r_new": 0.3365, "n": 60989, "pct_measured": 49.7}}}, {"site": "AU-Ctr", "site_name": "Cape Tribulation", "country": "Australia", "igbp": "EBF", "igbp_long": "Evergreen Broadleaf Forest", "lat": -16.1033, "lon": 145.4469, "period": "2010-2017", "years": 8.0, "metrics": {"Qle": {"nme_ctrl": 0.5704, "nme_new": 0.5788, "rmse_ctrl": 93.526, "rmse_new": 91.4646, "bias_ctrl": -19.73, "bias_new": -10.4832, "r_ctrl": 0.7054, "r_new": 0.7302, "n": 101213, "pct_measured": 72.2}, "Qh": {"nme_ctrl": 0.9435, "nme_new": 0.8221, "rmse_ctrl": 89.0879, "rmse_new": 74.9967, "bias_ctrl": 45.6335, "bias_new": 36.9565, "r_ctrl": 0.8365, "r_new": 0.832, "n": 100877, "pct_measured": 71.9}, "NEE": {"nme_ctrl": 2.4037, "nme_new": 3.4007, "rmse_ctrl": 26.7498, "rmse_new": 39.1496, "bias_ctrl": -7.7764, "bias_new": -19.6686, "r_ctrl": 0.7557, "r_new": 0.7713, "n": 66489, "pct_measured": 47.4}}}, {"site": "AU-Cum", "site_name": "CUP_EC", "country": "Australia", "igbp": "EBF", "igbp_long": "Evergreen Broadleaf Forests", "lat": -33.6133, "lon": 150.7225, "period": "2013-2018", "years": 6.0, "metrics": {"Qle": {"nme_ctrl": 0.5325, "nme_new": 0.4522, "rmse_ctrl": 64.8319, "rmse_new": 56.4711, "bias_ctrl": 4.6569, "bias_new": -4.5533, "r_ctrl": 0.7695, "r_new": 0.7724, "n": 85356, "pct_measured": 81.2}, "Qh": {"nme_ctrl": 0.345, "nme_new": 0.3591, "rmse_ctrl": 47.6076, "rmse_new": 47.8421, "bias_ctrl": 3.0071, "bias_new": 16.0495, "r_ctrl": 0.9105, "r_new": 0.9219, "n": 90323, "pct_measured": 85.9}, "NEE": {"nme_ctrl": 3.801, "nme_new": 1.6681, "rmse_ctrl": 18.5738, "rmse_new": 8.2267, "bias_ctrl": -0.7331, "bias_new": 6.1132, "r_ctrl": 0.523, "r_new": 0.6641, "n": 51423, "pct_measured": 48.9}}}, {"site": "AU-GWW", "site_name": "Great Western Woodlands", "country": "Australia", "igbp": "SAV", "igbp_long": "Savannas", "lat": -30.1913, "lon": 120.6541, "period": "2013-2017", "years": 5.0, "metrics": {"Qle": {"nme_ctrl": 0.9608, "nme_new": 0.6768, "rmse_ctrl": 52.8392, "rmse_new": 27.4348, "bias_ctrl": 11.8996, "bias_new": 1.5567, "r_ctrl": 0.6196, "r_new": 0.6343, "n": 67814, "pct_measured": 77.4}, "Qh": {"nme_ctrl": 0.2861, "nme_new": 0.4426, "rmse_ctrl": 43.2619, "rmse_new": 68.5069, "bias_ctrl": 3.9111, "bias_new": 25.9001, "r_ctrl": 0.9273, "r_new": 0.9431, "n": 66299, "pct_measured": 75.6}, "NEE": {"nme_ctrl": 0.9012, "nme_new": 9.2889, "rmse_ctrl": 1.583, "rmse_new": 13.27, "bias_ctrl": 0.3696, "bias_new": 11.929, "r_ctrl": 0.4504, "r_new": 0.2247, "n": 44621, "pct_measured": 50.9}}}, {"site": "AU-How", "site_name": "Howard Springs", "country": "Australia", "igbp": "WSA", "igbp_long": "Woody Savannas", "lat": -12.4952, "lon": 131.15, "period": "2003-2017", "years": 15.0, "metrics": {"Qle": {"nme_ctrl": 0.3236, "nme_new": 0.3264, "rmse_ctrl": 64.4729, "rmse_new": 64.7493, "bias_ctrl": -17.2791, "bias_new": -7.7081, "r_ctrl": 0.8896, "r_new": 0.8833, "n": 195302, "pct_measured": 74.3}, "Qh": {"nme_ctrl": 0.385, "nme_new": 0.3575, "rmse_ctrl": 45.9202, "rmse_new": 42.6363, "bias_ctrl": 15.6408, "bias_new": 4.8287, "r_ctrl": 0.9073, "r_new": 0.8929, "n": 195176, "pct_measured": 74.2}, "NEE": {"nme_ctrl": 2.6595, "nme_new": 1.5173, "rmse_ctrl": 19.3752, "rmse_new": 11.9884, "bias_ctrl": 14.0401, "bias_new": 1.8724, "r_ctrl": 0.4756, "r_new": 0.5568, "n": 116440, "pct_measured": 44.3}}}, {"site": "AU-Stp", "site_name": "Sturt Plains", "country": "Australia", "igbp": "GRA", "igbp_long": "Grasslands", "lat": -17.1507, "lon": 133.3502, "period": "2010-2017", "years": 8.0, "metrics": {"Qle": {"nme_ctrl": 0.6188, "nme_new": 0.4598, "rmse_ctrl": 70.0973, "rmse_new": 47.7132, "bias_ctrl": 5.5175, "bias_new": -1.7878, "r_ctrl": 0.8198, "r_new": 0.8616, "n": 113833, "pct_measured": 81.2}, "Qh": {"nme_ctrl": 0.4793, "nme_new": 0.4463, "rmse_ctrl": 72.0002, "rmse_new": 65.6471, "bias_ctrl": 24.8044, "bias_new": 30.5953, "r_ctrl": 0.938, "r_new": 0.9647, "n": 114095, "pct_measured": 81.3}, "NEE": {"nme_ctrl": 5.0581, "nme_new": 3.1732, "rmse_ctrl": 12.1404, "rmse_new": 7.7454, "bias_ctrl": 9.9351, "bias_new": 6.7747, "r_ctrl": 0.3409, "r_new": 0.3786, "n": 67630, "pct_measured": 48.2}}}, {"site": "AU-Tum", "site_name": "Tumbarumba", "country": "Australia", "igbp": "EBF", "igbp_long": "Evergreen Broadleaf Forests", "lat": -35.6566, "lon": 148.1517, "period": "2002-2017", "years": 16.0, "metrics": {"Qle": {"nme_ctrl": 0.5071, "nme_new": 0.4713, "rmse_ctrl": 78.2121, "rmse_new": 73.4875, "bias_ctrl": -28.9482, "bias_new": -21.6528, "r_ctrl": 0.7707, "r_new": 0.7832, "n": 68687, "pct_measured": 49.0}, "Qh": {"nme_ctrl": 0.6894, "nme_new": 0.6094, "rmse_ctrl": 95.0539, "rmse_new": 83.2599, "bias_ctrl": 41.6371, "bias_new": 33.0264, "r_ctrl": 0.8869, "r_new": 0.8874, "n": 67620, "pct_measured": 48.2}, "NEE": {"nme_ctrl": 2.5796, "nme_new": 2.4869, "rmse_ctrl": 26.8066, "rmse_new": 25.7261, "bias_ctrl": -20.6891, "bias_new": -20.1523, "r_ctrl": 0.5072, "r_new": 0.5215, "n": 47353, "pct_measured": 33.8}}}, {"site": "BR-Sa3", "site_name": "Santarem-Km83-Logged Forest", "country": "Brazil", "igbp": "EBF", "igbp_long": "Evergreen Broadleaf Forests", "lat": -3.018, "lon": -54.9714, "period": "2001-2003", "years": 3.0, "metrics": {"Qle": {"nme_ctrl": 0.3425, "nme_new": 0.3616, "rmse_ctrl": 73.9916, "rmse_new": 78.4926, "bias_ctrl": -10.8879, "bias_new": -19.5743, "r_ctrl": 0.8533, "r_new": 0.8454, "n": 38675, "pct_measured": 73.6}, "Qh": {"nme_ctrl": 0.5575, "nme_new": 0.9529, "rmse_ctrl": 43.3071, "rmse_new": 70.7741, "bias_ctrl": 13.8022, "bias_new": 30.1102, "r_ctrl": 0.8264, "r_new": 0.8594, "n": 39814, "pct_measured": 75.7}, "NEE": {"nme_ctrl": 1.7893, "nme_new": 2.2951, "rmse_ctrl": 22.2121, "rmse_new": 27.9712, "bias_ctrl": 1.9661, "bias_new": -5.5953, "r_ctrl": 0.5795, "r_new": 0.7308, "n": 26733, "pct_measured": 50.9}}}, {"site": "CA-Qfo", "site_name": "Quebec - Eastern Boreal, Mature Black Spruce", "country": "Quebec, Canada", "igbp": "ENF", "igbp_long": "Evergreen Needleleaf Forests", "lat": 49.6925, "lon": -74.3421, "period": "2004-2010", "years": 7.0, "metrics": {"Qle": {"nme_ctrl": 0.4807, "nme_new": 0.5298, "rmse_ctrl": 26.8758, "rmse_new": 29.1312, "bias_ctrl": 1.2408, "bias_new": 5.9338, "r_ctrl": 0.813, "r_new": 0.8493, "n": 104676, "pct_measured": 85.3}, "Qh": {"nme_ctrl": 0.5058, "nme_new": 0.4124, "rmse_ctrl": 55.2649, "rmse_new": 44.6514, "bias_ctrl": 15.8061, "bias_new": 4.0437, "r_ctrl": 0.8893, "r_new": 0.883, "n": 103175, "pct_measured": 84.1}, "NEE": {"nme_ctrl": 6.0223, "nme_new": 1.7687, "rmse_ctrl": 22.9422, "rmse_new": 5.8168, "bias_ctrl": -7.9314, "bias_new": -0.3659, "r_ctrl": 0.8668, "r_new": 0.8877, "n": 74648, "pct_measured": 60.8}}}, {"site": "CH-Dav", "site_name": "Davos- Seehorn forest", "country": "Switzerland", "igbp": "ENF", "igbp_long": "Evergreen Needleleaf Forests", "lat": 46.8153, "lon": 9.8559, "period": "1997-2014", "years": 18.0, "metrics": {"Qle": {"nme_ctrl": 0.654, "nme_new": 0.7785, "rmse_ctrl": 56.8683, "rmse_new": 68.0412, "bias_ctrl": -6.486, "bias_new": 3.7696, "r_ctrl": 0.6258, "r_new": 0.6201, "n": 228563, "pct_measured": 72.4}, "Qh": {"nme_ctrl": 0.8241, "nme_new": 0.6613, "rmse_ctrl": 72.1964, "rmse_new": 56.6256, "bias_ctrl": 28.602, "bias_new": 7.4777, "r_ctrl": 0.7649, "r_new": 0.7239, "n": 256411, "pct_measured": 81.3}, "NEE": {"nme_ctrl": 2.5079, "nme_new": 2.5818, "rmse_ctrl": 17.1189, "rmse_new": 18.937, "bias_ctrl": -8.4388, "bias_new": -10.3543, "r_ctrl": 0.6213, "r_new": 0.6139, "n": 94860, "pct_measured": 30.1}}}, {"site": "CN-Cha", "site_name": "Changbaishan", "country": "China", "igbp": "MF", "igbp_long": "Mixed Forests", "lat": 42.4025, "lon": 128.0958, "period": "2003-2005", "years": 3.0, "metrics": {"Qle": {"nme_ctrl": 0.4964, "nme_new": 0.3821, "rmse_ctrl": 41.3286, "rmse_new": 29.6773, "bias_ctrl": 3.8055, "bias_new": -4.6689, "r_ctrl": 0.884, "r_new": 0.9, "n": 39771, "pct_measured": 75.6}, "Qh": {"nme_ctrl": 0.5382, "nme_new": 0.5158, "rmse_ctrl": 50.7388, "rmse_new": 47.9419, "bias_ctrl": 13.8241, "bias_new": 21.569, "r_ctrl": 0.844, "r_new": 0.893, "n": 43829, "pct_measured": 83.3}, "NEE": {"nme_ctrl": 2.3025, "nme_new": 0.8475, "rmse_ctrl": 20.6899, "rmse_new": 7.3396, "bias_ctrl": -10.5512, "bias_new": -0.8612, "r_ctrl": 0.7935, "r_new": 0.8771, "n": 18145, "pct_measured": 34.5}}}, {"site": "CN-Din", "site_name": "Dinghushan", "country": "China", "igbp": "EBF", "igbp_long": "Evergreen Broadleaf Forests", "lat": 23.1733, "lon": 112.5361, "period": "2003-2005", "years": 3.0, "metrics": {"Qle": {"nme_ctrl": 0.6755, "nme_new": 0.4945, "rmse_ctrl": 71.2178, "rmse_new": 48.2399, "bias_ctrl": 19.0117, "bias_new": -0.7805, "r_ctrl": 0.8086, "r_new": 0.8031, "n": 36411, "pct_measured": 69.2}, "Qh": {"nme_ctrl": 0.5077, "nme_new": 0.5913, "rmse_ctrl": 39.9795, "rmse_new": 47.1729, "bias_ctrl": -5.0868, "bias_new": 15.5258, "r_ctrl": 0.8339, "r_new": 0.8466, "n": 38041, "pct_measured": 72.3}, "NEE": {"nme_ctrl": 4.6759, "nme_new": 2.569, "rmse_ctrl": 39.7021, "rmse_new": 17.3492, "bias_ctrl": -19.9665, "bias_new": -3.0098, "r_ctrl": 0.7878, "r_new": 0.8683, "n": 11644, "pct_measured": 22.1}}}, {"site": "DE-Geb", "site_name": "Gebesee", "country": "Germany", "igbp": "CRO", "igbp_long": "Croplands", "lat": 51.1001, "lon": 10.9143, "period": "2001-2014", "years": 14.0, "metrics": {"Qle": {"nme_ctrl": 0.5243, "nme_new": 0.5714, "rmse_ctrl": 43.975, "rmse_new": 48.4895, "bias_ctrl": 15.259, "bias_new": 16.7544, "r_ctrl": 0.8448, "r_new": 0.829, "n": 182347, "pct_measured": 74.3}, "Qh": {"nme_ctrl": 0.6287, "nme_new": 0.6438, "rmse_ctrl": 40.1996, "rmse_new": 42.6255, "bias_ctrl": -6.4411, "bias_new": -8.0012, "r_ctrl": 0.7648, "r_new": 0.7326, "n": 204816, "pct_measured": 83.5}, "NEE": {"nme_ctrl": 2.2413, "nme_new": 0.887, "rmse_ctrl": 18.5119, "rmse_new": 8.0354, "bias_ctrl": -8.0926, "bias_new": -0.4325, "r_ctrl": 0.5816, "r_new": 0.5882, "n": 111432, "pct_measured": 45.4}}}, {"site": "DE-Gri", "site_name": "Grillenburg", "country": "Germany", "igbp": "GRA", "igbp_long": "Grasslands", "lat": 50.9495, "lon": 13.5125, "period": "2004-2014", "years": 11.0, "metrics": {"Qle": {"nme_ctrl": 0.5607, "nme_new": 0.9679, "rmse_ctrl": 38.5005, "rmse_new": 68.6565, "bias_ctrl": 19.3538, "bias_new": 36.6204, "r_ctrl": 0.9179, "r_new": 0.879, "n": 153510, "pct_measured": 79.6}, "Qh": {"nme_ctrl": 1.2744, "nme_new": 1.4934, "rmse_ctrl": 43.9722, "rmse_new": 49.8916, "bias_ctrl": 6.4651, "bias_new": -9.0278, "r_ctrl": 0.8095, "r_new": 0.6947, "n": 166410, "pct_measured": 86.3}, "NEE": {"nme_ctrl": 2.1502, "nme_new": 2.0008, "rmse_ctrl": 15.8584, "rmse_new": 15.9438, "bias_ctrl": -8.4511, "bias_new": -7.1717, "r_ctrl": 0.8335, "r_new": 0.8265, "n": 100611, "pct_measured": 52.2}}}, {"site": "DE-Hai", "site_name": "Hainich", "country": "Germany", "igbp": "DBF", "igbp_long": "Deciduous Broadleaf Forests", "lat": 51.0792, "lon": 10.453, "period": "2000-2012", "years": 13.0, "metrics": {"Qle": {"nme_ctrl": 0.3932, "nme_new": 0.4283, "rmse_ctrl": 37.3997, "rmse_new": 41.133, "bias_ctrl": 8.0619, "bias_new": 9.1155, "r_ctrl": 0.8914, "r_new": 0.8772, "n": 112270, "pct_measured": 49.3}, "Qh": {"nme_ctrl": 0.5889, "nme_new": 0.5649, "rmse_ctrl": 55.9712, "rmse_new": 54.3869, "bias_ctrl": -2.6854, "bias_new": -2.4041, "r_ctrl": 0.8552, "r_new": 0.8343, "n": 182633, "pct_measured": 80.1}, "NEE": {"nme_ctrl": 1.4479, "nme_new": 1.6611, "rmse_ctrl": 15.4572, "rmse_new": 19.1535, "bias_ctrl": -7.9058, "bias_new": -9.3256, "r_ctrl": 0.7607, "r_new": 0.8547, "n": 69704, "pct_measured": 30.6}}}, {"site": "DE-Tha", "site_name": "Tharandt", "country": "Germany", "igbp": "ENF", "igbp_long": "Evergreen Needleleaf Forests", "lat": 50.9636, "lon": 13.5669, "period": "1998-2014", "years": 17.0, "metrics": {"Qle": {"nme_ctrl": 0.6327, "nme_new": 0.7397, "rmse_ctrl": 44.0661, "rmse_new": 53.9551, "bias_ctrl": 11.6015, "bias_new": 15.7855, "r_ctrl": 0.8403, "r_new": 0.8244, "n": 270814, "pct_measured": 90.9}, "Qh": {"nme_ctrl": 0.5966, "nme_new": 0.6299, "rmse_ctrl": 61.0309, "rmse_new": 66.5146, "bias_ctrl": -12.2638, "bias_new": -16.2709, "r_ctrl": 0.833, "r_new": 0.7846, "n": 272603, "pct_measured": 91.5}, "NEE": {"nme_ctrl": 1.2152, "nme_new": 1.162, "rmse_ctrl": 10.9277, "rmse_new": 12.2654, "bias_ctrl": -5.6934, "bias_new": -5.0239, "r_ctrl": 0.8819, "r_new": 0.8497, "n": 151980, "pct_measured": 51.0}}}, {"site": "DK-Sor", "site_name": "Soroe", "country": "Denmark", "igbp": "DBF", "igbp_long": "Deciduous Broadleaf Forests", "lat": 55.4859, "lon": 11.6446, "period": "1997-2014", "years": 18.0, "metrics": {"Qle": {"nme_ctrl": 0.4532, "nme_new": 0.509, "rmse_ctrl": 40.9396, "rmse_new": 47.2272, "bias_ctrl": 5.9381, "bias_new": 11.8689, "r_ctrl": 0.8524, "r_new": 0.8478, "n": 266035, "pct_measured": 84.3}, "Qh": {"nme_ctrl": 0.7391, "nme_new": 0.751, "rmse_ctrl": 64.8199, "rmse_new": 67.452, "bias_ctrl": 12.2144, "bias_new": 7.3783, "r_ctrl": 0.7624, "r_new": 0.7201, "n": 280649, "pct_measured": 88.9}, "NEE": {"nme_ctrl": 1.3747, "nme_new": 1.0629, "rmse_ctrl": 13.0179, "rmse_new": 12.1504, "bias_ctrl": -7.0242, "bias_new": -5.5199, "r_ctrl": 0.8519, "r_new": 0.866, "n": 203387, "pct_measured": 64.5}}}, {"site": "FI-Hyy", "site_name": "Hyytiala", "country": "Finland", "igbp": "ENF", "igbp_long": "Evergreen Needleleaf Forests", "lat": 61.8475, "lon": 24.295, "period": "1996-2014", "years": 19.0, "metrics": {"Qle": {"nme_ctrl": 0.4981, "nme_new": 0.4948, "rmse_ctrl": 30.1099, "rmse_new": 28.9461, "bias_ctrl": 0.8989, "bias_new": 3.7838, "r_ctrl": 0.7971, "r_new": 0.8312, "n": 272498, "pct_measured": 81.8}, "Qh": {"nme_ctrl": 0.5783, "nme_new": 0.5355, "rmse_ctrl": 43.7467, "rmse_new": 40.5054, "bias_ctrl": 6.8277, "bias_new": 3.091, "r_ctrl": 0.866, "r_new": 0.8564, "n": 280316, "pct_measured": 84.1}, "NEE": {"nme_ctrl": 2.4628, "nme_new": 1.5936, "rmse_ctrl": 12.1873, "rmse_new": 7.6632, "bias_ctrl": -3.4744, "bias_new": -1.0932, "r_ctrl": 0.9151, "r_new": 0.911, "n": 145782, "pct_measured": 43.8}}}, {"site": "FR-Gri", "site_name": "Grignon", "country": "France", "igbp": "CRO", "igbp_long": "Croplands: Lands covered with temporary crops followed by harvest and a bare soil period", "lat": 48.8442, "lon": 1.9519, "period": "2005-2013", "years": 9.0, "metrics": {"Qle": {"nme_ctrl": 0.4639, "nme_new": 0.5216, "rmse_ctrl": 41.1294, "rmse_new": 45.4724, "bias_ctrl": 8.2848, "bias_new": 10.0761, "r_ctrl": 0.8434, "r_new": 0.7972, "n": 72599, "pct_measured": 46.0}, "Qh": {"nme_ctrl": 0.6939, "nme_new": 0.9185, "rmse_ctrl": 35.6464, "rmse_new": 46.937, "bias_ctrl": 8.0789, "bias_new": 6.1779, "r_ctrl": 0.8237, "r_new": 0.7846, "n": 86975, "pct_measured": 55.1}, "NEE": {"nme_ctrl": 1.2517, "nme_new": 0.7576, "rmse_ctrl": 12.0742, "rmse_new": 8.6081, "bias_ctrl": -3.4693, "bias_new": 1.8263, "r_ctrl": 0.5544, "r_new": 0.5093, "n": 34163, "pct_measured": 21.7}}}, {"site": "FR-Pue", "site_name": "Puechabon", "country": "France", "igbp": "EBF", "igbp_long": "Evergreen Broadleaf Forests", "lat": 43.7414, "lon": 3.5958, "period": "2000-2014", "years": 15.0, "metrics": {"Qle": {"nme_ctrl": 0.9646, "nme_new": 0.8628, "rmse_ctrl": 62.7242, "rmse_new": 57.797, "bias_ctrl": 28.3119, "bias_new": 22.4126, "r_ctrl": 0.843, "r_new": 0.7917, "n": 200833, "pct_measured": 76.4}, "Qh": {"nme_ctrl": 0.3549, "nme_new": 0.3513, "rmse_ctrl": 46.6074, "rmse_new": 45.5827, "bias_ctrl": -3.72, "bias_new": 5.1039, "r_ctrl": 0.9123, "r_new": 0.918, "n": 175300, "pct_measured": 66.7}, "NEE": {"nme_ctrl": 3.4823, "nme_new": 2.0873, "rmse_ctrl": 17.9832, "rmse_new": 10.0343, "bias_ctrl": -5.5868, "bias_new": 4.2632, "r_ctrl": 0.7362, "r_new": 0.65, "n": 104311, "pct_measured": 39.7}}}, {"site": "GF-Guy", "site_name": "Guyaflux (French Guiana)", "country": "French Guiana", "igbp": "EBF", "igbp_long": "Evergreen Broadleaf Forests", "lat": 5.2788, "lon": -52.9249, "period": "2004-2014", "years": 11.0, "metrics": {"Qle": {"nme_ctrl": 0.4273, "nme_new": 0.4997, "rmse_ctrl": 95.2615, "rmse_new": 108.3556, "bias_ctrl": -35.3188, "bias_new": -51.6482, "r_ctrl": 0.8277, "r_new": 0.8472, "n": 146134, "pct_measured": 75.8}, "Qh": {"nme_ctrl": 0.8094, "nme_new": 1.0119, "rmse_ctrl": 73.0622, "rmse_new": 87.4688, "bias_ctrl": 34.8143, "bias_new": 50.3381, "r_ctrl": 0.8711, "r_new": 0.8975, "n": 155755, "pct_measured": 80.8}, "NEE": {"nme_ctrl": 1.7883, "nme_new": 1.4577, "rmse_ctrl": 23.3615, "rmse_new": 18.8965, "bias_ctrl": 0.1903, "bias_new": -1.1764, "r_ctrl": 0.8141, "r_new": 0.8468, "n": 87389, "pct_measured": 45.3}}}, {"site": "IT-Lav", "site_name": "Lavarone", "country": "Italy", "igbp": "ENF", "igbp_long": "Evergreen Needleleaf Forests", "lat": 45.9562, "lon": 11.2813, "period": "2005-2014", "years": 10.0, "metrics": {"Qle": {"nme_ctrl": 0.7982, "nme_new": 0.6207, "rmse_ctrl": 75.5549, "rmse_new": 61.0186, "bias_ctrl": 12.663, "bias_new": -14.1436, "r_ctrl": 0.7721, "r_new": 0.7241, "n": 86831, "pct_measured": 49.5}, "Qh": {"nme_ctrl": 0.5787, "nme_new": 0.4125, "rmse_ctrl": 108.6739, "rmse_new": 75.4388, "bias_ctrl": -34.108, "bias_new": -6.1603, "r_ctrl": 0.8754, "r_new": 0.8958, "n": 95788, "pct_measured": 54.6}, "NEE": {"nme_ctrl": 2.1074, "nme_new": 1.467, "rmse_ctrl": 24.9027, "rmse_new": 17.3788, "bias_ctrl": -15.8282, "bias_new": -6.5198, "r_ctrl": 0.7903, "r_new": 0.7564, "n": 50754, "pct_measured": 29.0}}}, {"site": "IT-MBo", "site_name": "Monte Bondone", "country": "Italy", "igbp": "GRA", "igbp_long": "Grasslands: Lands with herbaceous types of cover. Tree and shrub cover is less than 10%. Permanent wetlands lands with a permanent mixture of water and herbaceous or woody vegetation. The vegetation c", "lat": 46.0147, "lon": 11.0458, "period": "2003-2012", "years": 10.0, "metrics": {"Qle": {"nme_ctrl": 0.3782, "nme_new": 0.4117, "rmse_ctrl": 35.6353, "rmse_new": 38.9275, "bias_ctrl": 8.7366, "bias_new": 4.283, "r_ctrl": 0.9127, "r_new": 0.8812, "n": 118601, "pct_measured": 67.6}, "Qh": {"nme_ctrl": 1.0765, "nme_new": 1.3217, "rmse_ctrl": 70.3647, "rmse_new": 82.7703, "bias_ctrl": 29.2089, "bias_new": 32.9649, "r_ctrl": 0.7858, "r_new": 0.8145, "n": 125922, "pct_measured": 71.8}, "NEE": {"nme_ctrl": 2.8479, "nme_new": 2.815, "rmse_ctrl": 22.2789, "rmse_new": 22.6318, "bias_ctrl": -14.1309, "bias_new": -13.0097, "r_ctrl": 0.8121, "r_new": 0.8459, "n": 69540, "pct_measured": 39.7}}}, {"site": "IT-Noe", "site_name": "Arca di Noe - Le Prigionette", "country": "Italy", "igbp": "CSH", "igbp_long": "Closed Shrublands: Lands with woody vegetation less than 2 meters tall and with shrub canopy cover >60%. The shrub foliage can be either evergreen or deciduous.", "lat": 40.6062, "lon": 8.1517, "period": "2004-2014", "years": 11.0, "metrics": {"Qle": {"nme_ctrl": 0.8186, "nme_new": 0.8476, "rmse_ctrl": 48.8405, "rmse_new": 50.0116, "bias_ctrl": 12.9647, "bias_new": 10.8713, "r_ctrl": 0.779, "r_new": 0.7533, "n": 122349, "pct_measured": 63.4}, "Qh": {"nme_ctrl": 0.3056, "nme_new": 0.3307, "rmse_ctrl": 60.9313, "rmse_new": 65.3885, "bias_ctrl": -6.8108, "bias_new": -8.3734, "r_ctrl": 0.943, "r_new": 0.9364, "n": 128664, "pct_measured": 66.7}, "NEE": {"nme_ctrl": 2.0919, "nme_new": 0.8813, "rmse_ctrl": 9.9315, "rmse_new": 4.4419, "bias_ctrl": 0.0035, "bias_new": 1.4301, "r_ctrl": 0.7038, "r_new": 0.6524, "n": 67973, "pct_measured": 35.2}}}, {"site": "NL-Loo", "site_name": "Loobos", "country": "Netherlands", "igbp": "ENF", "igbp_long": "Evergreen Needleleaf Forests", "lat": 52.1666, "lon": 5.7436, "period": "1997-2013", "years": 17.0, "metrics": {"Qle": {"nme_ctrl": 0.5885, "nme_new": 0.493, "rmse_ctrl": 55.2469, "rmse_new": 44.9932, "bias_ctrl": 4.6345, "bias_new": -11.2141, "r_ctrl": 0.7648, "r_new": 0.7714, "n": 220047, "pct_measured": 73.8}, "Qh": {"nme_ctrl": 0.6291, "nme_new": 0.5778, "rmse_ctrl": 57.0123, "rmse_new": 49.747, "bias_ctrl": 8.3982, "bias_new": 24.862, "r_ctrl": 0.8342, "r_new": 0.8827, "n": 257690, "pct_measured": 86.5}, "NEE": {"nme_ctrl": 1.7661, "nme_new": 1.3946, "rmse_ctrl": 13.5896, "rmse_new": 9.5626, "bias_ctrl": -6.2757, "bias_new": 0.9194, "r_ctrl": 0.7615, "r_new": 0.8475, "n": 136757, "pct_measured": 45.9}}}, {"site": "RU-Fyo", "site_name": "Fyodorovskoye", "country": "Russia", "igbp": "ENF", "igbp_long": "Evergreen Needleleaf Forests: Lands dominated by woody vegetation with a percent cover >60% and height exceeding 2 meters. Almost all trees remain green all year. Canopy is never without green foliage", "lat": 56.4615, "lon": 32.9221, "period": "2003-2014", "years": 12.0, "metrics": {"Qle": {"nme_ctrl": 0.4284, "nme_new": 0.422, "rmse_ctrl": 38.8043, "rmse_new": 37.1113, "bias_ctrl": 2.6299, "bias_new": -2.9088, "r_ctrl": 0.8461, "r_new": 0.8253, "n": 172577, "pct_measured": 82.0}, "Qh": {"nme_ctrl": 0.6066, "nme_new": 0.5224, "rmse_ctrl": 62.1558, "rmse_new": 51.8213, "bias_ctrl": -4.5534, "bias_new": 0.9834, "r_ctrl": 0.8301, "r_new": 0.8556, "n": 188639, "pct_measured": 89.7}, "NEE": {"nme_ctrl": 2.5066, "nme_new": 2.2029, "rmse_ctrl": 18.0525, "rmse_new": 15.2443, "bias_ctrl": -9.3292, "bias_new": -6.3323, "r_ctrl": 0.8211, "r_new": 0.8518, "n": 92885, "pct_measured": 44.2}}}, {"site": "US-Blo", "site_name": "Blodgett Forest", "country": "California, United States", "igbp": "ENF", "igbp_long": "Evergreen Needleleaf Forests", "lat": 38.8953, "lon": -120.6328, "period": "2000-2006", "years": 7.0, "metrics": {"Qle": {"nme_ctrl": 0.5016, "nme_new": 0.398, "rmse_ctrl": 75.7688, "rmse_new": 60.2539, "bias_ctrl": -22.1464, "bias_new": -15.9455, "r_ctrl": 0.6615, "r_new": 0.8262, "n": 94312, "pct_measured": 76.8}, "Qh": {"nme_ctrl": 0.6854, "nme_new": 0.5789, "rmse_ctrl": 98.4296, "rmse_new": 81.1681, "bias_ctrl": 46.4047, "bias_new": 38.9199, "r_ctrl": 0.9016, "r_new": 0.9105, "n": 101858, "pct_measured": 83.0}, "NEE": {"nme_ctrl": 5.9652, "nme_new": 1.7211, "rmse_ctrl": 34.6982, "rmse_new": 9.3354, "bias_ctrl": -20.1944, "bias_new": 2.4569, "r_ctrl": 0.394, "r_new": 0.3837, "n": 30306, "pct_measured": 24.7}}}, {"site": "US-FPe", "site_name": "Fort Peck", "country": "Montana, United States", "igbp": "GRA", "igbp_long": "Grasslands", "lat": 48.3077, "lon": -105.1019, "period": "2000-2006", "years": 7.0, "metrics": {"Qle": {"nme_ctrl": 0.5754, "nme_new": 0.605, "rmse_ctrl": 42.6833, "rmse_new": 48.1678, "bias_ctrl": 4.5613, "bias_new": 0.7102, "r_ctrl": 0.8044, "r_new": 0.7252, "n": 79587, "pct_measured": 64.8}, "Qh": {"nme_ctrl": 0.7796, "nme_new": 0.7514, "rmse_ctrl": 72.0872, "rmse_new": 71.7913, "bias_ctrl": -23.7723, "bias_new": -21.2384, "r_ctrl": 0.5236, "r_new": 0.5288, "n": 96247, "pct_measured": 78.4}}}, {"site": "US-GLE", "site_name": "GLEES", "country": "Wyoming, United States", "igbp": "ENF", "igbp_long": "Evergreen Needleleaf Forests", "lat": 41.3665, "lon": -106.2399, "period": "2009-2014", "years": 6.0, "metrics": {"Qle": {"nme_ctrl": 0.7862, "nme_new": 0.8493, "rmse_ctrl": 44.7144, "rmse_new": 46.3767, "bias_ctrl": -15.5437, "bias_new": -6.0587, "r_ctrl": 0.5798, "r_new": 0.6218, "n": 76968, "pct_measured": 73.2}, "Qh": {"nme_ctrl": 0.3708, "nme_new": 0.4992, "rmse_ctrl": 67.0028, "rmse_new": 93.1966, "bias_ctrl": 3.0829, "bias_new": -35.9335, "r_ctrl": 0.9175, "r_new": 0.8683, "n": 77674, "pct_measured": 73.9}, "NEE": {"nme_ctrl": 2.5891, "nme_new": 1.1262, "rmse_ctrl": 8.7529, "rmse_new": 3.8369, "bias_ctrl": -3.4819, "bias_new": -0.8087, "r_ctrl": 0.6566, "r_new": 0.681, "n": 45701, "pct_measured": 43.5}}}, {"site": "US-Ha1", "site_name": "Harvard Forest EMS Tower (HFR1)", "country": "Massachusetts, United States", "igbp": "DBF", "igbp_long": "Deciduous Broadleaf Forests", "lat": 42.5378, "lon": -72.1715, "period": "1992-2012", "years": 21.0, "metrics": {"Qle": {"nme_ctrl": 0.6222, "nme_new": 0.4874, "rmse_ctrl": 50.9189, "rmse_new": 37.977, "bias_ctrl": 3.297, "bias_new": -10.9239, "r_ctrl": 0.866, "r_new": 0.8581, "n": 96927, "pct_measured": 52.6}, "Qh": {"nme_ctrl": 0.5699, "nme_new": 0.5058, "rmse_ctrl": 68.4573, "rmse_new": 58.68, "bias_ctrl": -14.9134, "bias_new": -4.4988, "r_ctrl": 0.7698, "r_new": 0.8276, "n": 136782, "pct_measured": 74.3}, "NEE": {"nme_ctrl": 1.9808, "nme_new": 1.3264, "rmse_ctrl": 18.3219, "rmse_new": 11.4617, "bias_ctrl": -7.8929, "bias_new": -3.4054, "r_ctrl": 0.8243, "r_new": 0.8375, "n": 64704, "pct_measured": 35.1}}}, {"site": "US-MMS", "site_name": "Morgan Monroe State Forest", "country": "Indiana, United States", "igbp": "DBF", "igbp_long": "Deciduous Broadleaf Forests: Lands dominated by woody vegetation with a percent cover >60% and height exceeding 2 meters.  Consists of broadleaf tree communities with an annual cycle of leaf-on and le", "lat": 39.3232, "lon": -86.4131, "period": "1999-2014", "years": 16.0, "metrics": {"Qle": {"nme_ctrl": 0.4924, "nme_new": 0.4096, "rmse_ctrl": 50.9105, "rmse_new": 42.0087, "bias_ctrl": 18.2659, "bias_new": 12.6144, "r_ctrl": 0.8789, "r_new": 0.8968, "n": 120851, "pct_measured": 86.2}, "Qh": {"nme_ctrl": 0.6078, "nme_new": 0.5624, "rmse_ctrl": 56.4866, "rmse_new": 50.6658, "bias_ctrl": 12.5002, "bias_new": 16.2486, "r_ctrl": 0.8301, "r_new": 0.8619, "n": 123386, "pct_measured": 88.0}, "NEE": {"nme_ctrl": 1.9565, "nme_new": 1.0867, "rmse_ctrl": 16.6254, "rmse_new": 9.3226, "bias_ctrl": -3.3819, "bias_new": -0.4949, "r_ctrl": 0.7633, "r_new": 0.8783, "n": 57647, "pct_measured": 41.1}}}, {"site": "US-Me2", "site_name": "Metolius-intermediate aged ponderosa pine", "country": "United States", "igbp": "ENF", "igbp_long": "Evergreen Needleleaf Forests", "lat": 44.4523, "lon": -121.5574, "period": "2002-2014", "years": 13.0, "metrics": {"Qle": {"nme_ctrl": 0.493, "nme_new": 0.5173, "rmse_ctrl": 44.2111, "rmse_new": 46.7629, "bias_ctrl": -11.6724, "bias_new": -17.609, "r_ctrl": 0.7803, "r_new": 0.7799, "n": 168647, "pct_measured": 74.0}, "Qh": {"nme_ctrl": 0.3966, "nme_new": 0.4339, "rmse_ctrl": 61.5306, "rmse_new": 67.6771, "bias_ctrl": 21.9752, "bias_new": 28.6538, "r_ctrl": 0.9203, "r_new": 0.9229, "n": 185896, "pct_measured": 81.6}, "NEE": {"nme_ctrl": 1.9321, "nme_new": 1.207, "rmse_ctrl": 13.3525, "rmse_new": 8.5691, "bias_ctrl": 0.1335, "bias_new": 5.6728, "r_ctrl": 0.5733, "r_new": 0.7267, "n": 46601, "pct_measured": 20.4}}}, {"site": "US-Myb", "site_name": "Mayberry Wetland", "country": "California, United States", "igbp": "WET", "igbp_long": "Permanent Wetlands", "lat": 38.0498, "lon": -121.7651, "period": "2011-2014", "years": 4.0, "metrics": {"Qle": {"nme_ctrl": 1.0923, "nme_new": 1.1031, "rmse_ctrl": 154.4799, "rmse_new": 160.1868, "bias_ctrl": -88.0415, "bias_new": -93.1419, "r_ctrl": 0.2167, "r_new": 0.1391, "n": 56980, "pct_measured": 81.3}, "Qh": {"nme_ctrl": 2.296, "nme_new": 2.3036, "rmse_ctrl": 197.0781, "rmse_new": 197.2476, "bias_ctrl": 93.0797, "bias_new": 95.7694, "r_ctrl": 0.6814, "r_new": 0.6778, "n": 65000, "pct_measured": 92.7}, "NEE": {"nme_ctrl": 1.392, "nme_new": 1.4447, "rmse_ctrl": 12.0803, "rmse_new": 11.6876, "bias_ctrl": 2.9937, "bias_new": 7.4315, "r_ctrl": -0.0396, "r_new": -0.1637, "n": 34268, "pct_measured": 48.9}}}, {"site": "US-NR1", "site_name": "Niwot Ridge Forest (LTER NWT1)", "country": "Colorado, United States", "igbp": "ENF", "igbp_long": "Evergreen Needleleaf Forests", "lat": 40.0329, "lon": -105.5464, "period": "1999-2014", "years": 16.0, "metrics": {"Qle": {"nme_ctrl": 0.6352, "nme_new": 0.671, "rmse_ctrl": 46.9464, "rmse_new": 49.2206, "bias_ctrl": -9.7488, "bias_new": -4.9868, "r_ctrl": 0.7054, "r_new": 0.7111, "n": 252423, "pct_measured": 90.0}, "Qh": {"nme_ctrl": 0.4193, "nme_new": 0.552, "rmse_ctrl": 66.5029, "rmse_new": 94.3535, "bias_ctrl": -3.2855, "bias_new": -26.7547, "r_ctrl": 0.8878, "r_new": 0.7794, "n": 251838, "pct_measured": 89.8}, "NEE": {"nme_ctrl": 3.6662, "nme_new": 0.6032, "rmse_ctrl": 20.4479, "rmse_new": 2.9256, "bias_ctrl": -7.628, "bias_new": 0.908, "r_ctrl": 0.7794, "r_new": 0.7183, "n": 126247, "pct_measured": 45.0}}}, {"site": "US-PFa", "site_name": "Park Falls/WLEF", "country": "Wisconsin, United States", "igbp": "MF", "igbp_long": "Mixed Forests", "lat": 45.9459, "lon": -90.2723, "period": "1995-2014", "years": 20.0, "metrics": {"Qle": {"nme_ctrl": 0.6294, "nme_new": 0.5081, "rmse_ctrl": 52.9848, "rmse_new": 40.9329, "bias_ctrl": 12.9909, "bias_new": 4.1208, "r_ctrl": 0.8144, "r_new": 0.8129, "n": 127363, "pct_measured": 72.6}, "Qh": {"nme_ctrl": 0.5895, "nme_new": 0.552, "rmse_ctrl": 51.0814, "rmse_new": 47.9633, "bias_ctrl": -0.8945, "bias_new": 8.1878, "r_ctrl": 0.7408, "r_new": 0.811, "n": 132523, "pct_measured": 75.6}, "NEE": {"nme_ctrl": 4.4972, "nme_new": 2.6423, "rmse_ctrl": 22.3402, "rmse_new": 12.6226, "bias_ctrl": -10.6335, "bias_new": -3.1297, "r_ctrl": 0.6767, "r_new": 0.7259, "n": 86457, "pct_measured": 49.3}}}, {"site": "US-SRG", "site_name": "Santa Rita Grassland", "country": "United States", "igbp": "GRA", "igbp_long": "Grasslands: Lands with herbaceous types of cover. Tree and shrub cover is less than 10%. Permanent wetlands lands with a permanent mixture of water and herbaceous or woody vegetation. The vegetation c", "lat": 31.7894, "lon": -110.8277, "period": "2009-2014", "years": 6.0, "metrics": {"Qle": {"nme_ctrl": 0.6116, "nme_new": 0.5757, "rmse_ctrl": 38.2325, "rmse_new": 32.4972, "bias_ctrl": 3.3471, "bias_new": -6.5617, "r_ctrl": 0.825, "r_new": 0.8134, "n": 93868, "pct_measured": 89.3}, "Qh": {"nme_ctrl": 0.2812, "nme_new": 0.2799, "rmse_ctrl": 38.07, "rmse_new": 35.4488, "bias_ctrl": 9.9603, "bias_new": 13.2667, "r_ctrl": 0.9581, "r_new": 0.9599, "n": 99793, "pct_measured": 94.9}, "NEE": {"nme_ctrl": 6.2262, "nme_new": 1.2758, "rmse_ctrl": 10.0344, "rmse_new": 2.8932, "bias_ctrl": 7.6214, "bias_new": 1.3701, "r_ctrl": 0.0994, "r_new": -0.0405, "n": 65147, "pct_measured": 61.9}}}, {"site": "US-SRM", "site_name": "Santa Rita Mesquite", "country": "United States", "igbp": "WSA", "igbp_long": "Woody Savannas", "lat": 31.8214, "lon": -110.866, "period": "2004-2014", "years": 11.0, "metrics": {"Qle": {"nme_ctrl": 0.6914, "nme_new": 0.6482, "rmse_ctrl": 40.5158, "rmse_new": 34.5873, "bias_ctrl": 2.2533, "bias_new": -3.0568, "r_ctrl": 0.7821, "r_new": 0.7781, "n": 169631, "pct_measured": 88.0}, "Qh": {"nme_ctrl": 0.2578, "nme_new": 0.2553, "rmse_ctrl": 40.184, "rmse_new": 36.7543, "bias_ctrl": 5.4197, "bias_new": 4.4357, "r_ctrl": 0.9497, "r_new": 0.9555, "n": 182330, "pct_measured": 94.5}, "NEE": {"nme_ctrl": 9.0877, "nme_new": 1.4554, "rmse_ctrl": 10.7511, "rmse_new": 2.2866, "bias_ctrl": 8.7729, "bias_new": 1.2841, "r_ctrl": 0.0316, "r_new": -0.013, "n": 96620, "pct_measured": 50.1}}}, {"site": "US-Ton", "site_name": "Tonzi Ranch", "country": "California, United States", "igbp": "WSA", "igbp_long": "Woody Savannas", "lat": 38.4316, "lon": -120.966, "period": "2001-2014", "years": 14.0, "metrics": {"Qle": {"nme_ctrl": 0.6008, "nme_new": 0.6969, "rmse_ctrl": 39.2757, "rmse_new": 47.7101, "bias_ctrl": 9.407, "bias_new": 7.769, "r_ctrl": 0.8265, "r_new": 0.8162, "n": 168626, "pct_measured": 68.7}, "Qh": {"nme_ctrl": 0.3071, "nme_new": 0.3359, "rmse_ctrl": 36.9478, "rmse_new": 41.2184, "bias_ctrl": -2.8362, "bias_new": -4.4721, "r_ctrl": 0.9317, "r_new": 0.9163, "n": 180429, "pct_measured": 73.5}, "NEE": {"nme_ctrl": 2.71, "nme_new": 3.2178, "rmse_ctrl": 12.1798, "rmse_new": 14.9049, "bias_ctrl": 2.0994, "bias_new": 2.3189, "r_ctrl": 0.314, "r_new": 0.3435, "n": 65607, "pct_measured": 26.7}}}, {"site": "US-UMB", "site_name": "Univ. of Mich. Biological Station", "country": "Michigan, United States", "igbp": "DBF", "igbp_long": "Deciduous Broadleaf Forests", "lat": 45.5598, "lon": -84.7138, "period": "2000-2014", "years": 15.0, "metrics": {"Qle": {"nme_ctrl": 0.4254, "nme_new": 0.4171, "rmse_ctrl": 45.7304, "rmse_new": 44.7234, "bias_ctrl": 11.4678, "bias_new": 10.9744, "r_ctrl": 0.8823, "r_new": 0.8838, "n": 101371, "pct_measured": 77.1}, "Qh": {"nme_ctrl": 0.4421, "nme_new": 0.4595, "rmse_ctrl": 47.4015, "rmse_new": 48.7292, "bias_ctrl": 8.1384, "bias_new": 10.9776, "r_ctrl": 0.871, "r_new": 0.8767, "n": 109492, "pct_measured": 83.3}, "NEE": {"nme_ctrl": 1.6333, "nme_new": 1.4554, "rmse_ctrl": 13.2828, "rmse_new": 12.1417, "bias_ctrl": -5.228, "bias_new": -4.3849, "r_ctrl": 0.6873, "r_new": 0.8461, "n": 65014, "pct_measured": 49.4}}}, {"site": "US-Var", "site_name": "Vaira Ranch- Ione", "country": "California, United States", "igbp": "GRA", "igbp_long": "Grasslands: Lands with herbaceous types of cover. Tree and shrub cover is less than 10%. Permanent wetlands lands with a permanent mixture of water and herbaceous or woody vegetation. The vegetation c", "lat": 38.4133, "lon": -120.9508, "period": "2001-2014", "years": 14.0, "metrics": {"Qle": {"nme_ctrl": 0.715, "nme_new": 0.7207, "rmse_ctrl": 43.9405, "rmse_new": 57.0118, "bias_ctrl": 20.2208, "bias_new": 18.6533, "r_ctrl": 0.8756, "r_new": 0.8606, "n": 205984, "pct_measured": 83.9}, "Qh": {"nme_ctrl": 0.3771, "nme_new": 0.3532, "rmse_ctrl": 47.1877, "rmse_new": 43.8108, "bias_ctrl": 18.7271, "bias_new": 14.4779, "r_ctrl": 0.9558, "r_new": 0.9367, "n": 223768, "pct_measured": 91.2}, "NEE": {"nme_ctrl": 2.6532, "nme_new": 3.3742, "rmse_ctrl": 10.7634, "rmse_new": 14.1338, "bias_ctrl": 1.8914, "bias_new": 2.4619, "r_ctrl": 0.6238, "r_new": 0.6479, "n": 102388, "pct_measured": 41.7}}}, {"site": "US-Whs", "site_name": "Walnut Gulch Lucky Hills Shrub", "country": "Arizona, United States", "igbp": "OSH", "igbp_long": "Open Shrublands: Lands with woody vegetation less than 2 meters tall and with shrub canopy cover between 10-60%. The shrub foliage can be either evergreen or deciduous.", "lat": 31.7438, "lon": -110.0522, "period": "2008-2014", "years": 7.0, "metrics": {"Qle": {"nme_ctrl": 0.7851, "nme_new": 0.5791, "rmse_ctrl": 43.3939, "rmse_new": 30.9059, "bias_ctrl": 9.1678, "bias_new": 2.3472, "r_ctrl": 0.7889, "r_new": 0.8395, "n": 109374, "pct_measured": 89.1}, "Qh": {"nme_ctrl": 0.2614, "nme_new": 0.2665, "rmse_ctrl": 35.9613, "rmse_new": 37.7214, "bias_ctrl": 1.6291, "bias_new": 11.4282, "r_ctrl": 0.9495, "r_new": 0.9653, "n": 115422, "pct_measured": 94.0}, "NEE": {"nme_ctrl": 1.0064, "nme_new": 1.769, "rmse_ctrl": 1.2047, "rmse_new": 1.7429, "bias_ctrl": 0.0509, "bias_new": 1.173, "r_ctrl": 0.1449, "r_new": 0.1266, "n": 70372, "pct_measured": 57.3}}}, {"site": "US-Wkg", "site_name": "Walnut Gulch Kendall Grasslands", "country": "Arizona, United States", "igbp": "GRA", "igbp_long": "Grasslands", "lat": 31.7365, "lon": -109.9419, "period": "2005-2014", "years": 10.0, "metrics": {"Qle": {"nme_ctrl": 0.6407, "nme_new": 0.6232, "rmse_ctrl": 35.9685, "rmse_new": 32.9836, "bias_ctrl": 3.4689, "bias_new": -0.2771, "r_ctrl": 0.8085, "r_new": 0.799, "n": 151676, "pct_measured": 86.5}, "Qh": {"nme_ctrl": 0.3905, "nme_new": 0.3148, "rmse_ctrl": 52.8813, "rmse_new": 43.1246, "bias_ctrl": 12.7487, "bias_new": 11.1666, "r_ctrl": 0.9529, "r_new": 0.9569, "n": 161751, "pct_measured": 92.3}, "NEE": {"nme_ctrl": 8.4878, "nme_new": 1.4149, "rmse_ctrl": 9.7438, "rmse_new": 2.2138, "bias_ctrl": 7.6961, "bias_new": 1.2728, "r_ctrl": 0.069, "r_new": 0.0094, "n": 74039, "pct_measured": 42.2}}}]};
+const VARS = ['Qle','Qh','NEE'];
+const VAR_LABEL = {Qle:'Latent heat', Qh:'Sensible heat', NEE:'CO₂ exchange'};
+const VAR_COLOR = {Qle:'var(--var-Qle)', Qh:'var(--var-Qh)', NEE:'var(--var-NEE)'};
+const fmt = (x,d=3)=> (x===null||x===undefined||Number.isNaN(x)) ? '–' : x.toFixed(d);
+
+document.getElementById('ctrl-chip-label').textContent = DATA.ctrl_label;
+document.getElementById('new-chip-label').textContent = DATA.new_label;
+document.getElementById('ctrl-gen').textContent = (DATA.ctrl_generated||'').slice(0,10);
+document.getElementById('new-gen').textContent = (DATA.new_generated||'').slice(0,10);
+document.getElementById('n-sites').textContent = DATA.n_sites;
+
+// ---- stat tiles ----
+const tilesEl = document.getElementById('stat-tiles');
+VARS.forEach(v=>{
+  const a = DATA.agg[v];
+  const improved = a.nme_new < a.nme_ctrl;
+  const deltaPct = 100*(a.nme_new-a.nme_ctrl)/a.nme_ctrl;
+  const tile = document.createElement('div');
+  tile.className='stat-tile';
+  tile.innerHTML = `
+    <div class="vname" style="color:${VAR_COLOR[v]}">${v}</div>
+    <div class="vsub">${VAR_LABEL[v]}</div>
+    <div class="arrow-line">
+      <span class="val-ctrl">${fmt(a.nme_ctrl,3)}</span>
+      <span style="color:var(--text-muted)">→</span>
+      <span class="val-new">${fmt(a.nme_new,3)}</span>
+      <span class="delta ${improved?'good':'bad'}">${deltaPct>=0?'+':''}${deltaPct.toFixed(1)}%</span>
+    </div>
+    <div class="counts">NME · ${a.n_improved} improved · ${a.n_worsened} worsened of ${a.n_sites}</div>`;
+  tilesEl.appendChild(tile);
+});
+
+// ---- aggregate table ----
+const aggTable = document.getElementById('agg-table');
+let aggHtml = `<thead><tr><th>Variable</th><th class="num">Metric</th><th class="num">Control</th><th class="num">This version</th><th class="num">Δ</th></tr></thead><tbody>`;
+VARS.forEach(v=>{
+  const a = DATA.agg[v];
+  const rowsDef = [
+    ['NME (↓ better)', a.nme_ctrl, a.nme_new, 3],
+    ['RMSE', a.rmse_ctrl, a.rmse_new, 2],
+    ['Bias', a.bias_ctrl, a.bias_new, 2],
+    ['R (↑ better)', a.r_ctrl, a.r_new, 3],
+  ];
+  rowsDef.forEach((r,i)=>{
+    const [label, c, n, d] = r;
+    const lowerBetter = label.includes('↓');
+    const higherBetter = label.includes('↑');
+    let cls = '';
+    if(lowerBetter) cls = n<c ? 'good' : (n>c?'bad':'');
+    if(higherBetter) cls = n>c ? 'good' : (n<c?'bad':'');
+    const delta = n-c;
+    aggHtml += `<tr>${i===0?`<td rowspan="4" style="color:${VAR_COLOR[v]}; font-weight:700; vertical-align:top;">${v}</td>`:''}
+      <td>${label}</td><td class="num">${fmt(c,d)}</td><td class="num">${fmt(n,d)}</td>
+      <td class="num"><span class="pill ${cls?('delta '+cls):''}" style="${cls?'':'background:transparent;'}">${delta>=0?'+':''}${fmt(delta,d)}</span></td></tr>`;
+  });
+});
+aggHtml += '</tbody>';
+aggTable.innerHTML = aggHtml;
+
+// ---- scatter plots ----
+const scatterGrid = document.getElementById('scatter-grid');
+const W=340, H=300, M={l:38,r:14,t:10,b:32};
+function scatterSVG(v){
+  const pts = DATA.sites.filter(s=>s.metrics[v]).map(s=>({x:s.metrics[v].nme_ctrl, y:s.metrics[v].nme_new, site:s.site}));
+  const maxV = Math.max(1, ...pts.map(p=>Math.max(p.x,p.y))) * 1.05;
+  const sx = x => M.l + (x/maxV)*(W-M.l-M.r);
+  const sy = y => H-M.b - (y/maxV)*(H-M.t-M.b);
+  let ticks = [];
+  for(let t=0;t<=maxV;t+= maxV>3?1:0.5) ticks.push(Math.round(t*10)/10);
+  let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${v} NME comparison scatter">`;
+  ticks.forEach(t=>{
+    svg += `<line x1="${sx(t)}" y1="${M.t}" x2="${sx(t)}" y2="${H-M.b}" stroke="var(--grid)" stroke-width="1"/>`;
+    svg += `<line x1="${M.l}" y1="${sy(t)}" x2="${W-M.r}" y2="${sy(t)}" stroke="var(--grid)" stroke-width="1"/>`;
+    svg += `<text x="${sx(t)}" y="${H-M.b+14}" font-size="9" fill="var(--text-muted)" text-anchor="middle">${t}</text>`;
+    svg += `<text x="${M.l-6}" y="${sy(t)+3}" font-size="9" fill="var(--text-muted)" text-anchor="end">${t}</text>`;
+  });
+  svg += `<line x1="${sx(0)}" y1="${sy(0)}" x2="${sx(maxV)}" y2="${sy(maxV)}" stroke="var(--axis)" stroke-width="1" stroke-dasharray="3,3"/>`;
+  svg += `<line x1="${M.l}" y1="${H-M.b}" x2="${W-M.r}" y2="${H-M.b}" stroke="var(--axis)" stroke-width="1"/>`;
+  svg += `<line x1="${M.l}" y1="${M.t}" x2="${M.l}" y2="${H-M.b}" stroke="var(--axis)" stroke-width="1"/>`;
+  pts.forEach(p=>{
+    const col = p.y<p.x ? 'var(--status-good)' : (p.y>p.x?'var(--status-critical)':'var(--text-muted)');
+    svg += `<circle cx="${sx(p.x)}" cy="${sy(p.y)}" r="3.4" fill="${col}" fill-opacity="0.8"><title>${p.site}: ${p.x.toFixed(3)} → ${p.y.toFixed(3)}</title></circle>`;
+  });
+  svg += `<text x="${(W)/2}" y="${H-4}" font-size="10" fill="var(--text-secondary)" text-anchor="middle">Control NME</text>`;
+  svg += `<text x="12" y="${H/2}" font-size="10" fill="var(--text-secondary)" text-anchor="middle" transform="rotate(-90 12 ${H/2})">This version NME</text>`;
+  svg += `</svg>`;
+  return svg;
+}
+VARS.forEach(v=>{
+  const cell = document.createElement('div');
+  cell.className='scatter-cell';
+  cell.innerHTML = `<div class="title" style="color:${VAR_COLOR[v]}">${v}</div>` + scatterSVG(v);
+  scatterGrid.appendChild(cell);
+});
+
+// ---- var tabs + site table ----
+const varTabs = document.getElementById('var-tabs');
+let currentVar = 'Qle';
+VARS.forEach(v=>{
+  const b = document.createElement('button');
+  b.textContent = v; b.setAttribute('role','tab'); b.setAttribute('aria-selected', v===currentVar?'true':'false');
+  b.onclick = ()=>{ currentVar=v; [...varTabs.children].forEach(c=>c.setAttribute('aria-selected', c===b?'true':'false')); renderTable(); };
+  varTabs.appendChild(b);
+});
+
+let sortKey='delta', sortDir=1, searchTerm='';
+function getRows(){
+  return DATA.sites.filter(s=>s.metrics[currentVar]).map(s=>{
+    const m = s.metrics[currentVar];
+    return {site:s.site, site_name:s.site_name, country:s.country, igbp:s.igbp,
+      nme_ctrl:m.nme_ctrl, nme_new:m.nme_new, delta:m.nme_new-m.nme_ctrl, r_ctrl:m.r_ctrl, r_new:m.r_new};
+  });
+}
+function renderTable(){
+  let rows = getRows();
+  if(searchTerm){
+    const q = searchTerm.toLowerCase();
+    rows = rows.filter(r=> [r.site,r.site_name,r.country,r.igbp].some(x=>String(x).toLowerCase().includes(q)));
+  }
+  rows.sort((a,b)=> sortDir*( (a[sortKey]>b[sortKey]) - (a[sortKey]<b[sortKey]) ));
+  const tbody = document.getElementById('table-body');
+  tbody.innerHTML = rows.map(r=>{
+    const cls = r.delta<0?'good':(r.delta>0?'bad':'');
+    return `<tr><td>${r.site}</td><td>${r.site_name}</td><td>${r.country}</td><td>${r.igbp}</td>
+      <td class="num">${fmt(r.nme_ctrl)}</td><td class="num">${fmt(r.nme_new)}</td>
+      <td class="num"><span class="pill ${cls?('delta '+cls):''}">${r.delta>=0?'+':''}${fmt(r.delta)}</span></td>
+      <td class="num">${fmt(r.r_ctrl)}</td><td class="num">${fmt(r.r_new)}</td></tr>`;
+  }).join('');
+}
+document.querySelectorAll('#site-table th[data-key]').forEach(th=>{
+  th.tabIndex = 0;
+  const activate = ()=>{ const k=th.dataset.key; if(sortKey===k) sortDir*=-1; else {sortKey=k; sortDir=1;} renderTable(); };
+  th.addEventListener('click', activate);
+  th.addEventListener('keydown', e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); activate(); }});
+});
+document.getElementById('site-search').addEventListener('input', e=>{ searchTerm=e.target.value; renderTable(); });
+renderTable();
+
+// ---- theme toggle ----
+(function(){
+  const btn = document.getElementById('theme-toggle');
+  const root = document.documentElement;
+  try{
+    const saved = localStorage.getItem('plumber2-compare-theme');
+    if(saved==='light'||saved==='dark') root.setAttribute('data-theme', saved);
+  }catch(e){}
+  btn.addEventListener('click', ()=>{
+    const isDark = root.getAttribute('data-theme')==='dark' ||
+      (root.getAttribute('data-theme')!=='light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    const next = isDark ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try{ localStorage.setItem('plumber2-compare-theme', next); }catch(e){}
+  });
+})();
+</script>
