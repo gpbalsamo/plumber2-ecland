@@ -48,6 +48,16 @@ The main path is **[Running the full 170-site or a 42-site subset on the HPC](#r
 
 For a handful of sites the mirror is not worth it — `scripts/submit_ecland_slurm.sh -x <exe> -S <site-list>` runs from `$PERM` directly. To skip SLURM entirely, see [One site at a time](#one-site-at-a-time) or [Running locally on macOS](#running-locally-on-macos).
 
+### 3b. Check water-balance closure
+
+Verify each site's raw output conserves water before trusting anything downstream — `DelSoilMoist`, `DelSWE`, `DelIntercept` and (when `LEGWRECHARGE` is on) `Qrec`/`Qcap`/`DelAquifer` only exist in the raw `o_wat.nc`, not in the post-processed PLUMBER2-schema files, so this has to run first:
+
+```bash
+python3 scripts/check_water_budget.py --output-dir output
+```
+
+Reports, per site, the residual of `Rainf+Snowf+Evap+Qs+Qsb-DelIntercept-DelSoilMoist-DelSWE-DelAquifer` (this is `/home/pad/check_water_budget.sc`'s own 2007 closure check, extended by the `-DelAquifer` term now that the aquifer store has a diagnostic) as mm/yr and as a percentage of precipitation, plus — when the recharge/capillary-rise diagnostics are present — a "clamp loss" term isolating water lost or conjured specifically where the water table's `RGWTD_MIN`/`RDBEDROCK` bounds bind. Exits non-zero if any site exceeds both `--tol-abs` (default 5 mm/yr) and `--tol-frac` (default 1% of precipitation), so it can gate a CI-style check. This is how ecLand `ec22e00` (`LEGWRECHARGE` double-counting recharge) and `2470a28` (a Fan et al. initial water-table depth outside `[RGWTD_MIN,RDBEDROCK]` causing an unaccounted cold-start correction) were found.
+
 ### 4. Post-process
 
 Map the raw ecLand output onto the common PLUMBER2 variable schema (`Qle`, `Qh`, `NEE`, `GPP`, soil moisture and temperature profiles, and the derived `SWup` and `Rnet` = `SWnet` + `LWnet`):
@@ -241,6 +251,7 @@ Key scripts. The shell scripts resolve the repository root from their own locati
 | `scratch_mirror.sh` | `push` / `pull` / `status` between `$PERM` and `$SCRATCH` |
 | `postproc_plumber2.py` | Raw ecLand output → PLUMBER2 variable schema |
 | `check_plumber2_dates.py` | Check the post-processed time axes |
+| `check_water_budget.py` | Check raw-output water-balance closure per site |
 | `benchmark_plumber2.py` | Score against observations, build the dashboard |
 | `plot_sites_map.py` | Render `plumber2_sites_map.png` |
 
