@@ -58,6 +58,16 @@ python3 scripts/check_water_budget.py --output-dir output
 
 Reports, per site, the residual of `Rainf+Snowf+Evap+Qs+Qsb-DelIntercept-DelSoilMoist-DelSWE-DelAquifer` (this is `/home/pad/check_water_budget.sc`'s own 2007 closure check, extended by the `-DelAquifer` term now that the aquifer store has a diagnostic) as mm/yr and as a percentage of precipitation, plus — when the recharge/capillary-rise diagnostics are present — a "clamp loss" term isolating water lost or conjured specifically where the water table's `RGWTD_MIN`/`RDBEDROCK` bounds bind. Exits non-zero if any site exceeds both `--tol-abs` (default 5 mm/yr) and `--tol-frac` (default 1% of precipitation), so it can gate a CI-style check. This is how ecLand `ec22e00` (`LEGWRECHARGE` double-counting recharge) and `2470a28` (a Fan et al. initial water-table depth outside `[RGWTD_MIN,RDBEDROCK]` causing an unaccounted cold-start correction) were found.
 
+### 3c. Check energy-balance closure
+
+Same idea for energy — `o_efl.nc`'s own `DelSoilHeat`/`DelColdCont` storage terms are always zero (dead diagnostics, gated behind a debug-only namelist switch), so this reconstructs soil heat content from ecLand's own apparent-energy formula and snow heat content from an approximate multi-layer enthalpy formula, and checks both against the run's `SWnet+LWnet+Qh+Qle` integral:
+
+```bash
+python3 scripts/check_energy_budget.py --output-dir output
+```
+
+Reports, per site, the run-mean residual in W/m2 and as a percentage of mean net radiation. Exits non-zero if any site exceeds `--tol-wm2` (default 5.0). Snow-covered sites carry an expected residual of order 1-3 W/m2 that is not a bug (see the module docstring for the traced mechanism) — a short run starting far from thermal equilibrium can show a similar-sized residual from genuine soil-column spin-up drift, which running with a higher `-l NLOOP` resolves.
+
 ### 4. Post-process
 
 Map the raw ecLand output onto the common PLUMBER2 variable schema (`Qle`, `Qh`, `NEE`, `GPP`, soil moisture and temperature profiles, and the derived `SWup` and `Rnet` = `SWnet` + `LWnet`):
@@ -266,6 +276,7 @@ Key scripts. The shell scripts resolve the repository root from their own locati
 | `postproc_plumber2.py` | Raw ecLand output → PLUMBER2 variable schema |
 | `check_plumber2_dates.py` | Check the post-processed time axes |
 | `check_water_budget.py` | Check raw-output water-balance closure per site |
+| `check_energy_budget.py` | Check raw-output energy-balance closure per site |
 | `benchmark_plumber2.py` | Score against observations, build the dashboard |
 | `compare_plumber2.py` | Pair two runs' dashboards into one comparison view |
 | `plot_sites_map.py` | Render `plumber2_sites_map.png` |
