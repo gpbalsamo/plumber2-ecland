@@ -72,15 +72,15 @@ def main():
         rmse_n = [r['metrics'][v]['rmse_new'] for r in rows if v in r['metrics']]
         bias_c = [r['metrics'][v]['bias_ctrl'] for r in rows if v in r['metrics']]
         bias_n = [r['metrics'][v]['bias_new'] for r in rows if v in r['metrics']]
-        r_c = [r['metrics'][v]['r_ctrl'] for r in rows if v in r['metrics']]
-        r_n = [r['metrics'][v]['r_new'] for r in rows if v in r['metrics']]
+        r_c = [r['metrics'][v]['r_ctrl'] for r in rows if v in r['metrics'] and r['metrics'][v]['r_ctrl'] is not None]
+        r_n = [r['metrics'][v]['r_new'] for r in rows if v in r['metrics'] and r['metrics'][v]['r_new'] is not None]
         n = len(vals_c)
         agg[v] = {
             'n_sites': n,
             'nme_ctrl': sum(vals_c)/n, 'nme_new': sum(vals_n)/n,
             'rmse_ctrl': sum(rmse_c)/n, 'rmse_new': sum(rmse_n)/n,
             'bias_ctrl': sum(bias_c)/n, 'bias_new': sum(bias_n)/n,
-            'r_ctrl': sum(r_c)/n, 'r_new': sum(r_n)/n,
+            'r_ctrl': sum(r_c)/len(r_c) if r_c else None, 'r_new': sum(r_n)/len(r_n) if r_n else None,
             'n_improved': sum(1 for c, nn in zip(vals_c, vals_n) if nn < c),
             'n_worsened': sum(1 for c, nn in zip(vals_c, vals_n) if nn > c),
         }
